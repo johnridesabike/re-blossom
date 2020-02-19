@@ -1,0 +1,48 @@
+{
+  "name": "re-blossom",
+  "namespace": "Blossom",
+  "version": "1.0",
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    },
+    {
+      "dir": "__tests__",
+      "type": "dev"
+    },
+    {
+      "dir": "__benchmarks__",
+      "type": "dev"
+    }
+  ],
+  "package-specs": [
+    {
+      "module": "commonjs",
+      "in-source": false
+    },
+    {
+      "module": "es6-global",
+      "in-source": false
+    },
+    {
+      "module": "es6",
+      "in-source": false
+    }
+  ],
+  "suffix": ".bs.js",
+  "bs-dependencies": [
+    "bs-log"
+  ],
+  "bs-dev-dependencies": [
+    "@glennsl/bs-jest"
+  ],
+  "ppx-flags": [
+    ["bs-log/ppx", "--lib=re-blossom"]
+  ],
+  "warnings": {
+    "number": "+A-48",
+    "error": "+A-3-44-102"
+  },
+  "refmt": 3
+}
