@@ -56,8 +56,6 @@
 
   This code uses features from the BuckleScript compiler to output efficient
   JavaScript. It will require modification to compile on other platforms.
-
-  -John
  */
 /*******************************************************************************
   Part I: The types
@@ -65,7 +63,8 @@
 module ParityList = {
   /**
    * This works like a linked list, only with the parity enforced.
-   * It's used to store each blossom's children.
+   * It's used to store each blossom's children. Whether a child is odd or even
+   * is significant.
    */
   type even('a) =
     | Empty
