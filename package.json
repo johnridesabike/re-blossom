@@ -1,6 +1,7 @@
 {
   "name": "re-blossom",
   "version": "1.0.1",
+  "description": "A Reason implementation of the blossom maximum-matching algorithm",
   "scripts": {
     "build": "bsb -make-world",
     "start": "bsb -make-world -w",
@@ -19,6 +20,7 @@
     "Matching",
     "Blossom algorithm"
   ],
+  "homepage": "https://johnridesa.bike/re-blossom/",
   "author": {
     "name": "John Jackson",
     "email": "johnbicyclejackson@icloud.com",
