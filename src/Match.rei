@@ -63,25 +63,31 @@ let make:
 let get: (t('vertex, 'identity), 'vertex) => option('vertex);
 
 /**
- * Reduces over the pairs of vertex mates. Takes an uncurried `f` function.
+ * Reduces over the pairs of vertex mates. Each pair is used twice, once in each
+ * order.
+ * Takes an uncurried `f` function.
  */
 let reduceU:
   (t('vertex, 'identity), ~init: 'a, ~f: (. 'a, 'vertex, 'vertex) => 'a) => 'a;
 
 /**
- * Reduces over the pairs of vertex mates.
+ * Reduces over the pairs of vertex mates. Each pair is used twice, once in each
+ * order.
  */
 let reduce:
   (t('vertex, 'identity), ~init: 'a, ~f: ('a, 'vertex, 'vertex) => 'a) => 'a;
 
 /**
- * Iterates over the pairs of vertex mates. Takes an uncurried `f` function.
+ * Iterates over the pairs of vertex mates. Each pair is used twice, once in
+ * order.
+ * Takes an uncurried `f` function.
  */
 let forEachU:
   (t('vertex, 'identity), ~f: (. 'vertex, 'vertex) => unit) => unit;
 
 /**
- * Iterates over the pairs of vertex mates.
+ * Iterates over the pairs of vertex mates. Each pair is used twice, once in
+ * each order.
  */
 let forEach: (t('vertex, 'identity), ~f: ('vertex, 'vertex) => unit) => unit;
 
@@ -91,7 +97,8 @@ let forEach: (t('vertex, 'identity), ~f: ('vertex, 'vertex) => unit) => unit;
 let toMap: t('vertex, 'identity) => Belt.Map.t('vertex, 'vertex, 'identity);
 
 /**
- * Returns a list of tuples for each pair of vertex mates.
+ * Returns a list of tuples for each pair of vertex mates. Each pair is used
+ * twice, once in each order.
  */
 let toList: t('vertex, 'identity) => list(('vertex, 'vertex));
 

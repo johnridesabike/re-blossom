@@ -1,12 +1,13 @@
 # Re-Blossom 🌺
 
-This is a Reason implementation of the famous
-[blossom algorithm](https://en.wikipedia.org/wiki/Blossom_algorithm). It finds a
-maximum matching of vertices on weighted graphs.
+Re-Blossom is a [Reason](https://reasonml.github.io/) implementation of the
+famous [blossom algorithm](https://en.wikipedia.org/wiki/Blossom_algorithm). It
+finds a maximum matching of vertices on general, undirected, weighted graphs.
 
 ## Installation
 
-You need an LTS version of [Node.js](https://nodejs.org/) installed.
+You need familiarity with [Node.js](https://nodejs.org/) and npm (which comes
+with Node.js) or Yarn package manager.
 
 Re-Blossom requires [BuckleScript](https://bucklescript.github.io/) as a peer
 dependency, so you will have to install it separately. Add it by running:
@@ -34,7 +35,8 @@ and list Re-Blossom in the `bs-dependencies`.
 
 ## How it works
 
-Matching along a weighted graph is notoriously difficult. Let's begin with a
+Matching along an undirected, weighted graph is notoriously difficult. The
+blossom algorithm does the heavy lifting for us in O(n³) time. Let's look at a
 simple example.
 
 Suppose you have a list of chess players, `[Mary, Joseph, Matthew, Mark, Luke,
@@ -58,9 +60,9 @@ Your first step is to list all of your possible pairings.
 ]
 ```
 
-(Typically your list would be much longer, but this is just an illustration.)
+(Typically your list will be much longer, but this is just an illustration.)
 
-Next, you would need to determine the *weight* of each pairing. This is a
+Next, you will need to determine the *weight* of each pairing. This is a
 floating-point number that indicates how desirable that pairing is.
 
 ```reason
@@ -80,7 +82,7 @@ floating-point number that indicates how desirable that pairing is.
 ```
 
 In graph theory, each of the people is a "vertex," and each pair of people is an
-"edge." It may help to visualize it in 2D space.
+"edge." We can visualize it in 2D space.
 
 ```
   Andrew ---10--- Philip                  Peter
@@ -95,8 +97,8 @@ In graph theory, each of the people is a "vertex," and each pair of people is an
 ```
 
 Now we let the algorithm work its magic. It will find a series of edges that
-have the highest possible combined weight, but so that no vertex is listed
-twice. In this example, the result would be:
+have the highest possible combined weight, where no vertex is listed twice, and
+where no vertex is without a mate. In this example, the result is:
 ```reason
 [
   (Mary, Joseph),
@@ -220,7 +222,10 @@ let result = Blossom.Match.make(~id=(module MyTypeCmp), ~cmp=MyType.cmp, graph);
 
 This algorithm passes all of the tests from similar implementations, but hasn't
 seen much real-world use. There may still be failure states that have not been
-discovered yet.
+discovered yet. The specific dangers are `Failure` exceptions, infinite loops,
+or missing pairings. These should never happen, but, if they do, please
+[file an issue](https://github.com/johnridesabike/re-blossom/issues) with
+information about your graph.
 
 This code uses BuckleScript-specific optimizations so it can compile to
 efficient JavaScript. In the future, it may support other platforms as well.
@@ -238,6 +243,13 @@ types.
 
 [Joris van Rantwijk's Python implementation](http://jorisvr.nl/article/maximum-matching)
 was the basis of both the JavaScript version and this Reason version. 
+
+
+## Changelog
+
+### 1.0.1
+
+- Initial release.
 
 ## Development
 
