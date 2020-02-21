@@ -21,7 +21,6 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
  */
-open Belt;
 open Jest;
 open Expect;
 
@@ -834,7 +833,7 @@ describe("Input tests", () => {
        *         Joseph ------ 55 ----- Mark ----30---- James  *
        ********************************************************/
       Match.make(
-        ~id=(module Id.MakeComparable(Person)),
+        ~id=(module Belt.Id.MakeComparable(Person)),
         ~cmp=Person.cmp,
         Person.[
           (Mary, Joseph, 40.),
@@ -899,7 +898,7 @@ describe("Input tests", () => {
         let cmp = (a, b) => compare(toString(a), toString(b));
       };
       Match.make(
-        ~id=(module Id.MakeComparable(Person)),
+        ~id=(module Belt.Id.MakeComparable(Person)),
         ~cmp=Person.cmp,
         Person.[
           (Mary, Joseph, 9.),
@@ -939,7 +938,7 @@ describe("Input tests", () => {
           };
       };
       Match.make(
-        ~id=(module Id.MakeComparable(StringOrInt)),
+        ~id=(module Belt.Id.MakeComparable(StringOrInt)),
         ~cmp=StringOrInt.cmp,
         StringOrInt.[
           (Int(1), Int(2), 40.),
@@ -1014,9 +1013,9 @@ describe("Output tests", () => {
        ])
   );
   test("toMap", () =>
-    Map.eq(
+    Belt.Map.eq(
       Match.toMap(result),
-      Map.fromArray(
+      Belt.Map.fromArray(
         ~id=(module Match.Int.Cmp),
         [|
           (1, 2),

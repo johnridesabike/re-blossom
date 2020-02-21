@@ -6,10 +6,11 @@
     "build": "bsb -make-world",
     "start": "bsb -make-world -w",
     "clean": "bsb -clean-world",
-    "test": "jest /lib/js/ --watchAll",
-    "test:coverage": "jest /lib/js/ --watchAll --coverage",
+    "test": "jest",
+    "test:watch": "jest --watchAll",
     "bench": "node ./lib/js/__benchmarks__/Init.bs.js",
-    "browser": "browserify -r edmonds-blossom -o ./lib/bundle.js && serve ."
+    "browser": "browserify -r edmonds-blossom -o ./lib/bundle.js && serve .",
+    "preversion": "npm test"
   },
   "keywords": [
     "BuckleScript",
