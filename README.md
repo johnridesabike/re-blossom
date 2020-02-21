@@ -285,11 +285,6 @@ Run the tests:
 npm run test
 ```
 
-Run the tests and generate coverage (JavaScript coverage only):
-```sh
-npm run test:coverage
-```
-
 Run benchmarks that compare it to the similar JavaScript algorithm:
 ```sh
 npm run bench
