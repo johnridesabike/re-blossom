@@ -26,7 +26,6 @@
  * This is its own module to make it easier for us to load the same scripts in a
  * browser or in Node.
  */
-
 [@bs.module]
 external jsBlossom: Benchmarks.JsBlossom.t = "edmonds-blossom";
 
@@ -35,4 +34,4 @@ external makeSuite: string => Benchmarks.BenchmarkJs.t = "Suite";
 
 let suite = makeSuite("Re-Blossom vs JS Blossom");
 
-Benchmarks.make(suite, jsBlossom);
+Benchmarks.make((module NodeLogger), suite, jsBlossom);

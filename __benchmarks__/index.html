@@ -24,7 +24,7 @@
   SOFTWARE.
 -->
 <head>
-    <title>Tests</title>
+    <title>Re-Blossom benchmarks</title>
 </head>
 <body>
 <h1>Re-Blossom benchmarks</h1>
@@ -44,12 +44,12 @@
 <script src="../lib/bundle.js"></script>
 <script type=module>
     var jsBlossom = require("edmonds-blossom");
-    import runBenchmark from "../lib/es6_global/__benchmarks__/Benchmarks.bs.js";
+    import runBenchmark, {BrowserLogger} from "../lib/es6_global/__benchmarks__/Benchmarks.bs.js";
 
     function benchmark(event) {
         event.preventDefault();
         var suite = Benchmark.Suite("Re-Blossom vs JS Blossom");
-        runBenchmark(suite, jsBlossom);
+        runBenchmark(BrowserLogger, suite, jsBlossom);
     }
 
     document.querySelector("#benchmark").onclick = benchmark;

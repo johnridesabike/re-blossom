@@ -24,10 +24,6 @@
     {
       "module": "es6-global",
       "in-source": false
-    },
-    {
-      "module": "es6",
-      "in-source": false
     }
   ],
   "suffix": ".bs.js",
