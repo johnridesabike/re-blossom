@@ -27,50 +27,46 @@ module JsBlossom = {
   type t = (. array((int, int, float))) => array(int);
 
   /* Turn a list of lists into a list of arrays for JS */
-  let data_int = List.map(BenchData.IntData.data, List.toArray);
-  let data_str = List.map(BenchData.StringData.data, List.toArray);
 
   /* Functions to convert non-integer data for use by jsBlossom.
    * These may or may not reflect practical real-world use. They're just a
    * quick-and dirty way to make it work. */
 
-  let makeStrToIntKey:
-    array((string, string, float)) =>
-    (Map.Int.t(string), Map.String.t(int)) =
-    inputArray => {
-      let (intMap, strMap, _) =
+  let makeKeys:
+    (list(('v, 'v, float)), Belt.Id.comparable('v, 'identity)) =>
+    (Map.Int.t('v), Map.t('v, int, 'identity)) =
+    (inputArray, id) => {
+      let emptyMap = Map.make(~id);
+      let emptySet = Set.make(~id);
+      let (intMap, vertexMap, _) =
         /* Make a set of unique vertices. */
-        Array.reduceU(inputArray, Set.String.empty, (. acc, (i, j, _w)) =>
-          acc->Set.String.add(i)->Set.String.add(j)
+        List.reduceU(inputArray, emptySet, (. acc, (i, j, _w)) =>
+          acc->Set.add(i)->Set.add(j)
         )
         /* Map them to integer indices */
-        ->Set.String.reduceU(
-            (Map.Int.empty, Map.String.empty, 0),
-            (. (intMap, strMap, index), x) =>
+        ->Set.reduceU(
+            (Map.Int.empty, emptyMap, 0), (. (intMap, strMap, index), x) =>
             (
               Map.Int.set(intMap, index, x),
-              Map.String.set(strMap, x, index),
+              Map.set(strMap, x, index),
               succ(index),
             )
           );
-      (intMap, strMap);
+      (intMap, vertexMap);
     };
 
-  let strGraphToIntGraph:
-    (array((string, string, float)), Map.String.t(int)) =>
+  let graphToIntGraph:
+    (list(('v, 'v, float)), Map.t('v, int, 'identity)) =>
     array((int, int, float)) =
     (inputArray, strMap) =>
-      Array.reduceU(inputArray, [||], (. acc, (i, j, w)) =>
+      List.reduceU(inputArray, [||], (. acc, (i, j, w)) =>
         Array.concat(
           acc,
-          [|
-            (Map.String.getExn(strMap, i), Map.String.getExn(strMap, j), w),
-          |],
+          [|(Map.getExn(strMap, i), Map.getExn(strMap, j), w)|],
         )
       );
 
-  let intResultToStrResult:
-    (array(int), Map.Int.t(string)) => list((string, string)) =
+  let intResultToResult: (array(int), Map.Int.t('v)) => list(('v, 'v)) =
     (inputArray, intMap) =>
       Array.reduceWithIndexU(inputArray, [], (. acc, x, y) =>
         [(Map.Int.getExn(intMap, x), Map.Int.getExn(intMap, y)), ...acc]
@@ -79,18 +75,27 @@ module JsBlossom = {
 
 module BenchmarkJs = {
   type t;
-  module CurrentTarget = {
-    type benchmark = {
+  module Stats = {
+    type t = {
+      rme: float,
+      sample: array(float),
+    };
+  };
+  module Benchmark = {
+    type t = {
       name: string,
       hz: float,
+      stats: Stats.t,
     };
-    type t = Js.Dict.t(benchmark);
-    [@bs.get] external name: t => string = "name";
   };
-  type eventTarget;
+  module Suite = {
+    type t = Js.Dict.t(Benchmark.t);
+    [@bs.get] external name: t => string = "name";
+    [@bs.get] external length: t => int = "length";
+  };
   type event = {
-    currentTarget: CurrentTarget.t,
-    target: eventTarget,
+    currentTarget: Suite.t,
+    target: Benchmark.t,
   };
   type options = {async: bool};
   [@bs.send] external add: (t, string, unit => unit) => t = "add";
@@ -103,66 +108,125 @@ module BenchmarkJs = {
 
 let percentDiff = (a, b) => floor((b -. a) /. b *. 100.);
 
-let make: (BenchmarkJs.t, JsBlossom.t) => unit =
-  (suite, jsBlossom) => {
+let formatResult = (BenchmarkJs.Benchmark.{name, hz, _}, maxHz) => {
+  (percentDiff(hz, maxHz)->Js.String.make ++ "% slower", name);
+};
+
+module NodeLogger = NodeLogger;
+/* This makes it easy to import in the browser. */
+module BrowserLogger = {
+  include BrowserLogger;
+};
+
+module type Logger = {
+  let info: (string, string) => unit;
+  let infoWithData2: (string, string, (string, 'a), (string, 'b)) => unit;
+  let infoWithData3:
+    (string, string, (string, 'a), (string, 'b), (string, 'c)) => unit;
+  let infoWithData6:
+    (
+      string,
+      string,
+      (string, 'a),
+      (string, 'b),
+      (string, 'c),
+      (string, 'd),
+      (string, 'e),
+      (string, 'f)
+    ) =>
+    unit;
+};
+
+let make: ((module Logger), BenchmarkJs.t, JsBlossom.t) => unit =
+  (logger, suite, jsBlossom) => {
+    module Logger = (val logger);
     BenchmarkJs.(
       suite
       ->add("Re-Blossom: Integers", () =>
-          List.forEachU(BenchData.IntData.data, (. x) => Match.Int.make(x))
+          List.forEachU(BenchData.Int.data, (. x) => Match.Int.make(x))
         )
       ->add("JS Blossom: Integers", () =>
-          List.forEachU(JsBlossom.data_int, jsBlossom)
+          List.forEachU(BenchData.Int.data, (. x) =>
+            jsBlossom(. List.toArray(x))
+          )
         )
       ->add("Re-Blossom: Strings ", () =>
-          List.forEachU(BenchData.StringData.data, (. x) =>
-            Match.String.make(x)
-          )
+          List.forEachU(BenchData.String.data, (. x) => Match.String.make(x))
         )
       ->add("JS Blossom: Strings ", () => {
           List.forEachU(
-            JsBlossom.data_str,
+            BenchData.String.data,
             (. x) => {
-              let (intMap, strMap) = JsBlossom.makeStrToIntKey(x);
-              let y = JsBlossom.strGraphToIntGraph(x, strMap);
+              let (intMap, vertexMap) =
+                JsBlossom.makeKeys(x, (module BenchData.String.Cmp));
+              let y = JsBlossom.graphToIntGraph(x, vertexMap);
               let mates = jsBlossom(. y);
-              JsBlossom.intResultToStrResult(mates, intMap);
+              JsBlossom.intResultToResult(mates, intMap);
             },
           )
         })
-      ->on(
-          `start,
-          ({currentTarget, _}) => {
-            Js.log(currentTarget->CurrentTarget.name);
-            Js.log("**Beginning benchmarks. Higher ops/sec is better.**");
-          },
+      ->add("Re-Blossom: Variants", () => {
+          List.forEachU(BenchData.Person.data, (. x) =>
+            Match.make(
+              ~id=(module BenchData.Person.Cmp),
+              ~cmp=BenchData.Person.cmp,
+              x,
+            )
+          )
+        })
+      ->add("JS Blossom: Variants", () => {
+          List.forEachU(
+            BenchData.Person.data,
+            (. x) => {
+              let (intMap, vertexMap) =
+                JsBlossom.makeKeys(x, (module BenchData.Person.Cmp));
+              let y = JsBlossom.graphToIntGraph(x, vertexMap);
+              let mates = jsBlossom(. y);
+              JsBlossom.intResultToResult(mates, intMap);
+            },
+          )
+        })
+      ->on(`start, ({currentTarget, _}) =>
+          Logger.infoWithData2(
+            __MODULE__,
+            "Beginning benchmark",
+            ("name", currentTarget->Suite.name),
+            ("tests", currentTarget->Suite.length),
+          )
         )
-      ->on(`cycle, ({target, _}) => target->Js.String.make->Js.log)
+      ->on(`cycle, ({target, _}) =>
+          Logger.info(__MODULE__, target->Js.String.make)
+        )
       ->on(
           `complete,
           ({currentTarget, _}) => {
-            open CurrentTarget;
-            Js.log("**Percentage comparison**");
+            open Benchmark;
             let results =
-              List.keepMap(["0", "1", "2", "3"], Js.Dict.get(currentTarget))
+              currentTarget
+              ->Suite.length
+              ->List.makeBy(x => Js.String.make(x))
+              ->List.keepMap(Js.Dict.get(currentTarget))
               ->List.sort((a, b) => compare(b.hz, a.hz));
             switch (results) {
-            | [] => Js.log("No results? :(")
-            | [{name, hz: maxHz}, ...results] =>
+            | [] => Logger.info(__MODULE__, "No results? :(")
+            | [first, second, third, fourth, fifth, sixth] =>
+              Logger.infoWithData6(
+                __MODULE__,
+                "Percenage comparison",
+                ("   Fastest", first.name),
+                formatResult(second, first.hz),
+                formatResult(third, first.hz),
+                formatResult(fourth, first.hz),
+                formatResult(fifth, first.hz),
+                formatResult(sixth, first.hz),
+              )
+            | [{name, hz: maxHz, _}, ...results] =>
               Js.log("  Fastest  : " ++ name);
-              List.forEach(
-                results,
-                ({name, hz}) => {
-                  let percent = percentDiff(hz, maxHz)->Js.String.make;
-                  let leftPad =
-                    switch (Js.String.length(percent)) {
-                    | 1 => " "
-                    | _ => ""
-                    };
-                  Js.log(leftPad ++ percent ++ "% slower : " ++ name);
-                },
-              );
+              List.forEach(results, result => {
+                formatResult(result, maxHz)->Js.log
+              });
             };
-            Js.log("**Done.**");
+            Logger.info(__MODULE__, "Done");
           },
         )
       ->run({async: true})
