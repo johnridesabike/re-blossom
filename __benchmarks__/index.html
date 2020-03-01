@@ -41,9 +41,12 @@
 
 <script src="../node_modules/lodash/lodash.js"></script>
 <script src="../node_modules/benchmark/benchmark.js"></script>
-<script src="../lib/bundle.js"></script>
+<script>
+    var module = {}; // Just to get edmonds-blossom to work without a bundler.
+</script>
+<script src="https://unpkg.com/edmonds-blossom@1.0.0/app/blossom.js?module"></script>
 <script type=module>
-    var jsBlossom = require("edmonds-blossom");
+    var jsBlossom = module.exports;
     import runBenchmark, {BrowserLogger} from "../lib/es6_global/__benchmarks__/Benchmarks.bs.js";
 
     function benchmark(event) {
