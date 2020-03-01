@@ -244,17 +244,6 @@ types.
 [Joris van Rantwijk's Python implementation](http://jorisvr.nl/article/maximum-matching)
 was the basis of both the JavaScript version and this Reason version. 
 
-
-## Changelog
-
-### 1.0.2
-
-- Added package description.
-
-### 1.0.1
-
-- Initial release.
-
 ## Development
 
 Download the code:
