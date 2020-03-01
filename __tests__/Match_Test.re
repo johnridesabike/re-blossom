@@ -431,36 +431,69 @@ describe("Nasty cases", () => {
          (12, 11),
        ])
   );
-  test("Create nested S-blossom, relabel as S, expand recursively.", () =>
-    Match.Int.make([
-      (1, 2, 40.),
-      (1, 3, 40.),
-      (2, 3, 60.),
-      (2, 4, 55.),
-      (3, 5, 55.),
-      (4, 5, 50.),
-      (1, 8, 15.),
-      (5, 7, 30.),
-      (7, 6, 10.),
-      (8, 10, 10.),
-      (4, 9, 30.),
-    ])
-    |> Match.toList
-    |> sortResult(compare)
-    |> expect
-    |> toEqual([
-         (1, 2),
-         (2, 1),
-         (3, 5),
-         (4, 9),
-         (5, 3),
-         (6, 7),
-         (7, 6),
-         (8, 10),
-         (9, 4),
-         (10, 8),
-       ])
-  );
+  describe("Create nested S-blossom, relabel as S, expand recursively.", () => {
+    test("Create nested S-blossom, relabel as S, expand recursively.", () =>
+      Match.Int.make([
+        (1, 2, 40.),
+        (1, 3, 40.),
+        (2, 3, 60.),
+        (2, 4, 55.),
+        (3, 5, 55.),
+        (4, 5, 50.),
+        (1, 8, 15.),
+        (5, 7, 30.),
+        (7, 6, 10.),
+        (8, 10, 10.),
+        (4, 9, 30.),
+      ])
+      |> Match.toList
+      |> sortResult(compare)
+      |> expect
+      |> toEqual([
+           (1, 2),
+           (2, 1),
+           (3, 5),
+           (4, 9),
+           (5, 3),
+           (6, 7),
+           (7, 6),
+           (8, 10),
+           (9, 4),
+           (10, 8),
+         ])
+    );
+    test("Again, but slightly different.", () =>
+      Match.Int.make([
+        (1, 2, 40.),
+        (1, 3, 40.),
+        (2, 3, 60.),
+        (2, 4, 55.),
+        (3, 5, 55.),
+        (4, 5, 50.),
+        (1, 8, 15.),
+        (5, 7, 30.),
+        (7, 6, 10.),
+        (8, 10, 10.),
+        (4, 9, 30.),
+        (11, 10, 100.),
+      ])
+      |> Match.toList
+      |> sortResult(compare)
+      |> expect
+      |> toEqual([
+           (1, 8),
+           (2, 3),
+           (3, 2),
+           (4, 5),
+           (5, 4),
+           (6, 7),
+           (7, 6),
+           (8, 1),
+           (10, 11),
+           (11, 10),
+         ])
+    );
+  });
 });
 describe("Large data", () => {
   test("Simple large data", () => {
