@@ -1,15 +1,16 @@
 {
   "name": "re-blossom",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A Reason implementation of the blossom maximum-matching algorithm",
   "scripts": {
     "build": "bsb -make-world",
     "start": "bsb -make-world -w",
     "clean": "bsb -clean-world",
+    "pretest": "npm run build",
     "test": "jest",
     "test:watch": "jest --watchAll",
     "bench": "node ./lib/js/__benchmarks__/Init.bs.js",
-    "browser": "browserify -r edmonds-blossom -o ./lib/bundle.js && serve .",
+    "browser": "serve .",
     "preversion": "npm test"
   },
   "keywords": [
@@ -36,13 +37,17 @@
     "email": "johnbicyclejackson@icloud.com"
   },
   "license": "MIT",
+  "files": [
+    "src/**/*.re",
+    "src/**/*.rei",
+    "bsconfig.json"
+  ],
   "peerDependencies": {
     "bs-platform": "^7.1.1"
   },
   "devDependencies": {
     "@glennsl/bs-jest": "^0.4.9",
     "benchmark": "^2.1.4",
-    "browserify": "^16.5.0",
     "bs-platform": "^7.1.1",
     "edmonds-blossom": "^1.0.0",
     "serve": "^11.3.0"

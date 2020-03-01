@@ -304,15 +304,18 @@ module Endpoint = {
     | I(edge) => edge.i
     | J(edge) => edge.j;
 
-  let toReverseVertex =
-    fun
-    | I(edge) => edge.j
-    | J(edge) => edge.i;
-
   let reverse =
     fun
     | I(edge) => J(edge)
     | J(edge) => I(edge);
+
+  /**
+   * More performant than `reverse |> toVertex`.
+   */
+  let toReverseVertex =
+    fun
+    | I(edge) => edge.j
+    | J(edge) => edge.i;
 
   let _debug =
     fun
@@ -334,6 +337,8 @@ module Blossom = {
   type t('v) = blossom('v);
 
   let eq: (t('v), t('v)) => bool = (a, b) => a.content == b.content;
+
+  let _debug: t('v) => string = b => Js.String.make(b.content);
 };
 
 module Node = {
@@ -422,8 +427,11 @@ module Child = {
   type t('v) = child('v);
 
   let _debug = c =>
-    ParityList.Odd.reduceU(c, ~init=[||], ~f=(. acc, child) =>
-      Belt.Array.concat(acc, [|Node._debug(child.node)|])
+    ParityList.Odd.reduceU(c, ~init=[||], ~f=(. acc, {node, endpoint}) =>
+      Belt.Array.concat(
+        acc,
+        [|(Node._debug(node), Endpoint._debug(endpoint))|],
+      )
     );
 };
 
@@ -483,6 +491,8 @@ module Mates = {
   let isEmpty = Belt.Map.isEmpty;
 
   let has = Belt.Map.has;
+
+  let _debug = mates => mates->toList->Belt.List.toArray;
 };
 
 module Label = {
@@ -494,16 +504,17 @@ module Label = {
     | T(endpoint) => "T(" ++ Endpoint._debug(endpoint) ++ ")";
 
   /**
-   * Since it became an S-vertex/blossom, add its child vertices to the
-   * queue.
+   * Label a vertex S and add its inBlossom's children to the queue.
    */
   let assignS = (~v, ~label, ~queue) => {
+    let b = v.fields.inBlossom;
     [%log.debug
       "assignLabel";
-      ("w", Vertex._debug(v));
-      ("t", _debug(label))
+      ("Vertex", Vertex._debug(v));
+      ("Blossom", Node._debug(b));
+      ("Label", _debug(label));
+      ("PUSH", Node.Leaves._debug(b))
     ];
-    let b = v.fields.inBlossom;
     switch (b) {
     | Blossom(b) =>
       b.label = label;
@@ -512,20 +523,20 @@ module Label = {
     };
     v.bestEdge = None;
     v.label = label;
-    [%log.debug "PUSH"; ("PUSH", Node.Leaves._debug(b))];
     Node.Leaves.toList(b, ~init=queue);
   };
 
   /**
-   *`v` became a T-Vertex. Its mate will be labeled S.
+   * Label a vertex T and label its mate S.
    */
   let assignT = (~v, ~p, ~mates) => {
+    let b = v.fields.inBlossom;
     [%log.debug
       "assignLabel";
-      ("w", Vertex._debug(v));
-      ("t", _debug(T(p)))
+      ("Vertex", Vertex._debug(v));
+      ("Blossom", Node._debug(b));
+      ("Label", _debug(T(p)))
     ];
-    let b = v.fields.inBlossom;
     let label = T(p);
     switch (b) {
     | Blossom(b) =>
@@ -913,22 +924,22 @@ module AddBlossom = {
     | (true | false, Free | T(_)) => bestEdgeList
     };
 
+  let endpointReducer = b =>
+    (. bestEdgeList, endpoint) => {
+      let neighbor = Endpoint.toVertex(endpoint).fields.inBlossom;
+      let edge = Endpoint.toEdge(endpoint);
+      bestEdgesReducerHelper(b, neighbor, bestEdgeList, edge);
+    };
+
+  let bestEdgesReducer = b =>
+    (. bestEdgeList, (_node, edge)) => {
+      let neighbor =
+        Node.eqB(edge.j.fields.inBlossom, b)
+          ? edge.i.fields.inBlossom : edge.j.fields.inBlossom;
+      bestEdgesReducerHelper(b, neighbor, bestEdgeList, edge);
+    };
+
   let computeBestEdges = b => {
-    let endpointReducer =
-      (. bestEdgeList, endpoint) => {
-        let neighbor = Endpoint.toVertex(endpoint).fields.inBlossom;
-        let edge = Endpoint.toEdge(endpoint);
-        bestEdgesReducerHelper(b, neighbor, bestEdgeList, edge);
-      };
-
-    let edgeReducer =
-      (. bestEdgeList, (_node, edge)) => {
-        let neighbor =
-          Node.eqB(edge.j.fields.inBlossom, b)
-            ? edge.i.fields.inBlossom : edge.j.fields.inBlossom;
-        bestEdgesReducerHelper(b, neighbor, bestEdgeList, edge);
-      };
-
     ParityList.Odd.reduceU(
       b.fields.children,
       ~init=[],
@@ -944,12 +955,16 @@ module AddBlossom = {
               Belt.List.reduceU(
                 v.fields.neighbors,
                 bestEdgeList,
-                endpointReducer,
+                endpointReducer(b),
               )
             })
           /* Walk this sub-blossom's least-slack edges. */
           | Blossom({fields: {blossomBestEdges, _}, _}) =>
-            Belt.List.reduceU(blossomBestEdges, bestEdgeList, edgeReducer)
+            Belt.List.reduceU(
+              blossomBestEdges,
+              bestEdgeList,
+              bestEdgesReducer(b),
+            )
           };
         /* Forget about least-slack edges of this sub-blossom. */
         switch (child.node) {
@@ -1033,7 +1048,6 @@ module AddBlossom = {
 
 module ModifyBlossom = {
   open ParityList;
-  open Infix;
   /* When augmenting or expanding a blossom, we'll need to separate the base
      child, the "entry" child, and the list of children between them. Whether
      the entry child was odd or even will determine whether we go forward or
@@ -1049,10 +1063,12 @@ module ModifyBlossom = {
 
   let splitChildren = (childs, entryChild) => {
     open Node.Infix;
+    open ParityList.Infix;
     let Odd(base, childs) = childs;
     let rec loop = (frontChilds, backChilds) =>
       switch (backChilds) {
-      | Empty => /* base.child == entryChild */ NoSplit
+      | Empty when base.node =|= entryChild => NoSplit
+      | Empty => failwith("Entry child not found.")
       | Even(c1, tail) when c1.node =|= entryChild =>
         GoForward(base, Even.reverse(frontChilds), c1, tail)
       | Even(c1, Odd(c2, tail)) when c2.node =|= entryChild =>
@@ -1075,7 +1091,12 @@ module ModifyBlossom = {
    * consistent.
    */
   let rec augment = (b, v, mates) => {
-    [%log.debug "augmentBlossom"; ("v", Vertex._debug(v))];
+    [%log.debug
+      "augmentBlossom";
+      ("Blossom", Blossom._debug(b));
+      ("Vertex", Vertex._debug(v));
+      ("Mates", Mates._debug(mates))
+    ];
     /* Bubble up through the blossom tree from from the vertex to an immediate
        sub-blossom of `b`. */
     let t = bubbleBlossomTree(Vertex(v), v.parent, b);
@@ -1092,12 +1113,14 @@ module ModifyBlossom = {
       | GoForward(base, frontChilds, entryChild, backChilds) =>
         let moveList = Odd.concat(backChilds, Odd.make(base));
         let direction = Forward;
+        /* Rotate the list of sub-blossoms to put the new base at the front. */
         let children =
           Odd(entryChild, Odd.concat(backChilds, Odd(base, frontChilds)));
         Some((moveList, direction, children));
       | GoBackward(base, frontChilds, entryChild, backChilds) =>
         let moveList = Even.reverse(Even(base, frontChilds));
         let direction = Backward;
+        /* Rotate the list of sub-blossoms to put the new base at the front. */
         let children =
           Odd(entryChild, Even.concat(backChilds, Even(base, frontChilds)));
         Some((moveList, direction, children));
@@ -1110,26 +1133,30 @@ module ModifyBlossom = {
       let rec loopToBase = (children, mates, direction) =>
         switch (children) {
         | Empty => mates
-        | Even(c1, Odd(c2, rest)) =>
+        /* Step into the next two sub-blossoms and augment them recursively. */
+        | Even(child, Odd(child', rest)) =>
           let p =
             switch (direction) {
-            | Forward => c1.endpoint
-            | Backward => Endpoint.reverse(c2.endpoint)
+            | Forward => child.endpoint
+            | Backward => Endpoint.reverse(child'.endpoint)
             };
           let mates =
-            switch (c1.node) {
-            /* Step into the next sub-blossom and augment it recursively. */
+            switch (child.node) {
             | Blossom(b) => augment(b, Endpoint.toVertex(p), mates)
             | Vertex(_) => mates
             };
           let mates =
-            switch (c2.node) {
-            /* Step into the next sub-blossom and augment it recursively. */
+            switch (child'.node) {
             | Blossom(b) => augment(b, Endpoint.toReverseVertex(p), mates)
             | Vertex(_) => mates
             };
           /* Match the edge connecting those sub-blossoms. */
           let mates = Mates.Internal.setEdge(mates, Endpoint.toEdge(p));
+          [%log.debug
+            "PAIR";
+            ("v", Endpoint._debug(p));
+            ("w", p->Endpoint.reverse->Endpoint._debug)
+          ];
           loopToBase(rest, mates, direction);
         };
       loopToBase(moveList, mates, direction);
@@ -1140,18 +1167,20 @@ module ModifyBlossom = {
           (childsToBase, nextEndpoint, queue, mates, direction) =>
     switch (childsToBase) {
     | Odd({node, _}, Empty) => (node, queue, nextEndpoint)
-    | Odd(
-        {node: child1, endpoint: endpoint1},
-        Even({endpoint: endpoint2, _}, rest),
-      ) =>
-      Endpoint.toEdge(endpoint1).allowable = Allowed;
-      Endpoint.toEdge(endpoint2).allowable = Allowed;
+    | Odd({endpoint, _}, Even({endpoint: endpoint', _}, rest)) =>
+      Endpoint.toEdge(endpoint).allowable = Allowed;
+      Endpoint.toEdge(endpoint').allowable = Allowed;
       let queue =
-        Label.assignT(~v=Node.base(child1), ~p=nextEndpoint, ~mates, ~queue);
+        Label.assignT(
+          ~v=Endpoint.toReverseVertex(nextEndpoint),
+          ~p=nextEndpoint,
+          ~mates,
+          ~queue,
+        );
       let nextEndpoint =
         switch (direction) {
-        | Backward => endpoint2
-        | Forward =>
+        | Forward => endpoint'
+        | Backward =>
           let Odd({endpoint, _}, _) = rest;
           Endpoint.reverse(endpoint);
         };
@@ -1163,11 +1192,16 @@ module ModifyBlossom = {
    * Expand the given top-level blossom.
    */
   let rec expand = (~graph, ~b, ~stage, ~mates, ~queue) => {
+    let _debug_endstage =
+      switch (stage) {
+      | Endstage => "Endstage"
+      | NotEndstage => "Not endstage"
+      };
     [%log.debug
       "expandBlossom";
-      ("b", b.content);
-      ("endstage", stage);
-      ("children", Child._debug(b.fields.children))
+      ("Blossom", Blossom._debug(b));
+      ("Endstage", _debug_endstage);
+      ("Children", Child._debug(b.fields.children))
     ];
     /* Convert sub-blossoms into top-level blossoms. */
     let queue =
@@ -1199,8 +1233,8 @@ module ModifyBlossom = {
          relabeled. */
       | (T(labelEndpoint), NotEndstage) =>
         /* Start at the sub-blossom through which the expanding blossom obtained
-           its label, and relabel sub-blossoms until we reach the base. */
-        /* Figure out through which sub-blossom the expanding blossom obtained
+           its label, and relabel sub-blossoms until we reach the base.
+           Figure out through which sub-blossom the expanding blossom obtained
            its label initially. */
         let entryChild =
           Endpoint.toReverseVertex(labelEndpoint).fields.inBlossom;
@@ -1227,7 +1261,7 @@ module ModifyBlossom = {
             direction,
           );
         /* Relabel the base T-sub-blossom WITHOUT stepping through to its mate
-           (so don't call AssignLabel.t, call AssignLabel.tSingle instead.) */
+           (so don't call Label.assignT, call Label.assignTSingle instead.) */
         Node.removeBestEdge(base);
         Label.assignTSingle(~w=base, ~p);
         Label.assignTSingleVertex(~v=Endpoint.toReverseVertex(p), ~p);
@@ -1320,7 +1354,6 @@ module Delta = {
       switch (v.bestEdge, Node.label(v.fields.inBlossom)) {
       | (Some(edge), Free) =>
         let kslack = Edge.slack(edge);
-        [%log.debug "delta2"; ("d", kslack)];
         switch (deltaType) {
         | None => Some(Two({delta: kslack, edge}))
         | Some(
@@ -1602,7 +1635,7 @@ module Substage = {
     switch (queue) {
     | [] => NotAugmented({queue, mates, graph})
     | [vertex, ...queue] =>
-      [%log.debug "POP"; ("POP v", Vertex._debug(vertex))];
+      [%log.debug "POP"; ("Vertex", Vertex._debug(vertex))];
       switch (scanNeighbors(vertex, graph, mates, queue)) {
       | NotAugmented({queue, mates, graph}) =>
         labelingLoop(graph, mates, queue)
@@ -1618,10 +1651,10 @@ module Substage = {
     | NotAugmented({queue, mates, graph}) =>
       /* There is no augmenting path under these constraints;
          compute delta and reduce slack in the optimization problem. */
-      let deltaType = Delta.make(~cardinality, graph);
+      let delta = Delta.make(~cardinality, graph);
       /* Take action at the point where the minimum delta occurred. */
-      [%log.debug "delta"; ("delta", Delta._debug(deltaType))];
-      switch (deltaType) {
+      [%log.debug "DELTA"; ("delta", Delta._debug(delta))];
+      switch (delta) {
       /*No further improvement possible; optimim reached. */
       | Delta.One(delta) =>
         Graph.updateDualVarsByDelta(graph, ~delta);
@@ -1672,7 +1705,7 @@ let rec mainLoop = (~graph, ~mates, ~cardinality, ~stageNum, ~stageMax) =>
   if (stageNum == stageMax) {
     mates;
   } else {
-    [%log.debug "STAGE"; ("STAGE", stageNum)];
+    [%log.debug {j|STAGE $stageNum|j}; ("Mates", Mates._debug(mates))];
     /* Each iteration of this loop is a "stage". A stage finds an augmenting
        path and uses that to improve the matching. */
 
