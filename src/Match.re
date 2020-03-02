@@ -594,18 +594,16 @@ module Graph = {
     module EdgeCmp =
       Belt.Id.MakeComparableU({
         type t = (Id.t, Id.t);
+        /* This only works if the vertices are always in the same order.
+           See `edge'` below. */
         let cmp =
           (. (a, b), (y, z)) =>
             switch (cmpU(. a, y), cmpU(. b, z)) {
             | (0, 0) => 0
-            | _ =>
-              switch (cmpU(. a, z), cmpU(. b, y)) {
-              | (0, 0) => 0
-              | (c, d) =>
-                switch (c + d) {
-                | 0 => c
-                | e => e
-                }
+            | (c, d) =>
+              switch (c + d) {
+              | 0 => c
+              | e => e
               }
             };
       });
@@ -628,7 +626,13 @@ module Graph = {
         Belt.List.forEachU(vertices, (. v) => v.dualVar = maxWeight);
         {vertices, blossoms: [], maxWeight, edges, vertexSize};
       | [(iId, jId, weight), ...rawEdges] =>
-        if (cmpU(. iId, jId) == 0 || Belt.Set.has(edgeSet, (iId, jId))) {
+        /* To avoid duplicates, this ensures they're always ordered the same. */
+        let edge' =
+          switch (cmpU(. iId, jId)) {
+          | 1 => (iId, jId)
+          | _ => (jId, iId)
+          };
+        if (cmpU(. iId, jId) == 0 || Belt.Set.has(edgeSet, edge')) {
           loop(
             ~rawEdges,
             ~edges,
@@ -640,7 +644,7 @@ module Graph = {
           );
         } else {
           let maxWeight = max(maxWeight, weight);
-          let edgeSet = Belt.Set.add(edgeSet, (iId, jId));
+          let edgeSet = Belt.Set.add(edgeSet, edge');
           /* See if `i` or `j` are already created. If they are, update them. */
           switch (Belt.Map.(get(vertexMap, iId), get(vertexMap, jId))) {
           | (Some(i), Some(j)) =>
@@ -737,7 +741,7 @@ module Graph = {
               ~maxWeight,
             );
           };
-        }
+        };
       };
     loop(
       ~rawEdges,
