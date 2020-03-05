@@ -11,7 +11,8 @@
     "test:watch": "jest --watchAll",
     "bench": "node ./lib/js/__benchmarks__/Init.bs.js",
     "browser": "serve .",
-    "preversion": "npm test"
+    "preversion": "npm test",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "BuckleScript",
