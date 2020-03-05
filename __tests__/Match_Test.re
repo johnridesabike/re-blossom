@@ -462,7 +462,7 @@ describe("Nasty cases", () => {
            (10, 8),
          ])
     );
-    test("Again, but slightly different.", () =>
+    test("Again, but slightly different. (A)", () =>
       Match.Int.make([
         (1, 2, 40.),
         (1, 3, 40.),
@@ -491,6 +491,37 @@ describe("Nasty cases", () => {
            (8, 1),
            (10, 11),
            (11, 10),
+         ])
+    );
+    test("Again, but slightly different. (B)", () =>
+      Match.Int.make([
+        (1, 2, 40.),
+        (1, 3, 40.),
+        (2, 3, 60.),
+        (2, 4, 55.),
+        (3, 5, 55.),
+        (4, 5, 50.),
+        (1, 8, 15.),
+        (5, 7, 30.),
+        (7, 6, 10.),
+        (8, 10, 10.),
+        (4, 9, 30.),
+        (3, 6, 36.),
+      ])
+      |> Match.toList
+      |> sortResult(compare)
+      |> expect
+      |> toEqual([
+           (1, 2),
+           (2, 1),
+           (3, 6),
+           (4, 9),
+           (5, 7),
+           (6, 3),
+           (7, 5),
+           (8, 10),
+           (9, 4),
+           (10, 8),
          ])
     );
   });

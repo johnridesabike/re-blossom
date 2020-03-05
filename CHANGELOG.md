@@ -1,5 +1,9 @@
 # Re-Blossom Changelog
 
+## 1.0.5
+
+- Fixed a crash on some graphs.
+
 ## 1.0.4
 
 - Fixed a bug that allowed some duplicate edges.

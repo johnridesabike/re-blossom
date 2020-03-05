@@ -1129,11 +1129,11 @@ module ModifyBlossom = {
           Odd(entryChild, Even.concat(backChilds, Even(base, frontChilds)));
         Some((moveList, direction, children));
       };
+    b.fields.base = v;
     switch (loopData) {
     | None => mates
     | Some((moveList, direction, children)) =>
       b.fields.children = children;
-      b.fields.base = v;
       let rec loopToBase = (children, mates, direction) =>
         switch (children) {
         | Empty => mates
