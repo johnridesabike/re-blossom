@@ -1,5 +1,9 @@
 # Re-Blossom Changelog
 
+## 1.0.6
+
+- Fixed a crash on graphs with large blossoms.
+
 ## 1.0.5
 
 - Fixed a crash on some graphs.

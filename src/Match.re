@@ -875,7 +875,9 @@ module AddBlossom = {
         let Odd({node: child, _}, _) = frontChildren;
         /* The first front child was a SingleS, the back traced around to it. */
         if (child =|= nextW) {
-          NewBlossom(frontChildren);
+          NewBlossom(
+            Odd.concatEven(frontChildren, Even.reverse(backChildren)),
+          );
         } else {
           loop(front, traceBackward(nextW, backChildren));
         };
@@ -887,7 +889,9 @@ module AddBlossom = {
           };
         /* The first back child was a SingleS, the front traced around to it. */
         if (lastV =|= lastW) {
-          NewBlossom(frontChildren);
+          NewBlossom(
+            Odd.concatEven(frontChildren, Even.reverse(backChildren)),
+          );
         } else {
           loop(traceForward(lastV, frontChildren), back);
         };
