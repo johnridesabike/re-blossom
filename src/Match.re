@@ -138,7 +138,7 @@ module ParityList = {
         | Empty => acc
         | Even(a, Odd(b, tail)) => loop(acc <.> a <:> b, tail)
         };
-      loop(Odd(head, Empty), tail);
+      loop(make(head), tail);
     };
 
     let forEachU = (l, ~f) => reduceU(l, ~init=(), ~f=(. _, x) => f(. x));
@@ -154,6 +154,16 @@ module ParityList = {
 
     let concatEven = (Odd(head, tail), l2) =>
       Odd(head, Even.concat(tail, l2));
+
+    let trimToU = (Odd(head, tail), ~f) => {
+      let rec loop = (acc, l) =>
+        switch (l) {
+        | Even(a, _) when f(. a) => Some(reverse(acc))
+        | Empty => None
+        | Even(a, Odd(b, l)) => loop(Odd(b, Even(a, acc)), l)
+        };
+      loop(make(head), tail);
+    };
   };
 };
 
@@ -278,7 +288,7 @@ module Edge = {
   type t('v) = edge('v);
 
   /**
-   * Returns the slack of the given. (Does not work inside blossoms.)
+   * Returns the slack of the given edge. Does not work inside blossoms.
    */
   let slack = k => k.i.dualVar +. k.j.dualVar -. k.weight;
 
@@ -791,7 +801,7 @@ module Graph = {
 module AddBlossom = {
   /* First, we have to scan to see if we are able to add a blossom. */
   type traceResult('v, 'a) =
-    | DeadEnd('a)
+    | DeadEnd(Node.t('v), 'a)
     | FoundChild(Node.t('v), 'a);
 
   type scanResult('v) =
@@ -805,22 +815,22 @@ module AddBlossom = {
   let traceBackward = (w, backChildren) =>
     switch (Node.label(w)) {
     | Free
-    | SingleS => DeadEnd(backChildren)
+    | SingleS => DeadEnd(w, backChildren)
     | T(_) => failwith("Label should only be S")
     | S(p) =>
-      let w2 = Endpoint.toVertex(p).fields.inBlossom;
-      switch (Node.label(w2)) {
+      let w' = Endpoint.toVertex(p).fields.inBlossom;
+      switch (Node.label(w')) {
       | Free
       | SingleS
       | S(_) => failwith("Label should only be T")
-      | T(p2) =>
+      | T(p') =>
         let backChildren =
           ParityList.Infix.(
             backChildren
             <:> {node: w, endpoint: Endpoint.reverse(p)}
-            <.> {node: w2, endpoint: Endpoint.reverse(p2)}
+            <.> {node: w', endpoint: Endpoint.reverse(p')}
           );
-        let nextW = Endpoint.toVertex(p2).fields.inBlossom;
+        let nextW = Endpoint.toVertex(p').fields.inBlossom;
         FoundChild(nextW, backChildren);
       };
     };
@@ -832,25 +842,38 @@ module AddBlossom = {
   let traceForward = (v, frontChildren) =>
     switch (Node.label(v)) {
     | Free
-    | SingleS => DeadEnd(frontChildren)
+    | SingleS => DeadEnd(v, frontChildren)
     | T(_) => failwith("Label should only be S")
     | S(p) =>
-      let v2 = Endpoint.toVertex(p).fields.inBlossom;
-      switch (Node.label(v2)) {
+      let v' = Endpoint.toVertex(p).fields.inBlossom;
+      switch (Node.label(v')) {
       | Free
       | SingleS
       | S(_) => failwith("Label should only be T")
-      | T(p2) =>
-        let lastV = Endpoint.toVertex(p2).fields.inBlossom;
+      | T(p') =>
+        let lastV = Endpoint.toVertex(p').fields.inBlossom;
         let frontChildren =
           ParityList.Infix.(
             frontChildren
-            <.> {node: v2, endpoint: p}
-            <:> {node: lastV, endpoint: p2}
+            <.> {node: v', endpoint: p}
+            <:> {node: lastV, endpoint: p'}
           );
         FoundChild(lastV, frontChildren);
       };
     };
+
+  /**
+   * Scans the found children to see if there's a connecting "base" node.
+   */
+  let findConnection = (lastV, nextW, front, back) => {
+    open ParityList;
+    let children = Odd.concatEven(front, Even.reverse(back));
+    if (Node.eq(lastV, nextW)) {
+      Some(children);
+    } else {
+      Odd.trimToU(children, ~f=(. {node, _}) => Node.eq(node, lastV));
+    };
+  };
 
   /**
    * Trace back from the given edge's vertices to discover either a new blossom
@@ -863,57 +886,48 @@ module AddBlossom = {
       ("w", Vertex._debug(edge.j))
     ];
     open ParityList;
-    open Node.Infix;
 
-    let initialV = edge.i.fields.inBlossom;
-    let initialW = edge.j.fields.inBlossom;
-
-    let rec loop = (front, back) =>
-      switch (front, back) {
-      | (DeadEnd(_), DeadEnd(_)) => AugmentingPath
-      | (DeadEnd(frontChildren), FoundChild(nextW, backChildren)) =>
-        let Odd({node: child, _}, _) = frontChildren;
-        /* The first front child was a SingleS, the back traced around to it. */
-        if (child =|= nextW) {
-          NewBlossom(
-            Odd.concatEven(frontChildren, Even.reverse(backChildren)),
-          );
-        } else {
-          loop(front, traceBackward(nextW, backChildren));
-        };
-      | (FoundChild(lastV, frontChildren), DeadEnd(backChildren)) =>
-        let lastW =
-          switch (backChildren) {
-          | Empty => initialW
-          | Even({node, _}, _) => node
-          };
-        /* The first back child was a SingleS, the front traced around to it. */
-        if (lastV =|= lastW) {
-          NewBlossom(
-            Odd.concatEven(frontChildren, Even.reverse(backChildren)),
-          );
-        } else {
-          loop(traceForward(lastV, frontChildren), back);
-        };
-      | (FoundChild(lastV, frontChildren), FoundChild(nextW, backChildren))
-          when lastV =|= nextW =>
-        NewBlossom(
-          Odd.concatEven(frontChildren, Even.reverse(backChildren)),
-        )
-      | (FoundChild(lastV, frontChildren), FoundChild(nextW, backChildren)) =>
-        switch (traceBackward(nextW, backChildren)) {
-        | FoundChild(nextW, backChildren) when lastV =|= nextW =>
-          NewBlossom(
-            Odd.concatEven(frontChildren, Even.reverse(backChildren)),
-          )
-        | (DeadEnd(_) | FoundChild(_)) as back =>
-          loop(traceForward(lastV, frontChildren), back)
+    let rec loop = (frontPath, backPath) =>
+      switch (frontPath, backPath) {
+      | (DeadEnd(lastV, front), DeadEnd(nextW, back)) =>
+        switch (findConnection(lastV, nextW, front, back)) {
+        | Some(children) => NewBlossom(children)
+        | None => AugmentingPath
+        }
+      | (DeadEnd(lastV, front) as frontPath, FoundChild(nextW, back)) =>
+        switch (findConnection(lastV, nextW, front, back)) {
+        /* The first front child was a SingleS; the back traced around to it. */
+        | Some(children) => NewBlossom(children)
+        | None => loop(frontPath, traceBackward(nextW, back))
+        }
+      | (FoundChild(lastV, front), DeadEnd(nextW, back) as backPath) =>
+        switch (findConnection(lastV, nextW, front, back)) {
+        /* The first back child was a SingleS; the front traced around to it. */
+        | Some(children) => NewBlossom(children)
+        | None => loop(traceForward(lastV, front), backPath)
+        }
+      | (FoundChild(lastV, front), FoundChild(nextW, back)) =>
+        switch (findConnection(lastV, nextW, front, back)) {
+        | Some(children) => NewBlossom(children)
+        | None =>
+          switch (traceBackward(nextW, back)) {
+          | FoundChild(nextW, back) as backPath =>
+            switch (findConnection(lastV, nextW, front, back)) {
+            | Some(children) => NewBlossom(children)
+            | None => loop(traceForward(lastV, front), backPath)
+            }
+          | DeadEnd(_) as backPath =>
+            loop(traceForward(lastV, front), backPath)
+          }
         }
       };
+
+    let initialV = edge.i.fields.inBlossom;
+
     loop(
       /* Manually add the i child to connect the two lists. */
       FoundChild(initialV, Odd.make({node: initialV, endpoint: I(edge)})),
-      FoundChild(initialW, Empty),
+      FoundChild(edge.j.fields.inBlossom, Empty),
     );
   };
 
@@ -1060,30 +1074,49 @@ module ModifyBlossom = {
      child, the "entry" child, and the list of children between them. Whether
      the entry child was odd or even will determine whether we go forward or
      backward. */
-  type splitChildsDir('a) =
-    | NoSplit
-    | GoForward('a, Even.t('a), 'a, Odd.t('a))
-    | GoBackward('a, Odd.t('a), 'a, Even.t('a));
+  type splitChildren('v) =
+    | NoSplit({
+        base: Child.t('v),
+        rest: Even.t(Child.t('v)),
+      })
+    | GoForward({
+        base: Child.t('v),
+        front: Even.t(Child.t('v)),
+        entry: Child.t('v),
+        back: Odd.t(Child.t('v)),
+      })
+    | GoBackward({
+        base: Child.t('v),
+        front: Odd.t(Child.t('v)),
+        entry: Child.t('v),
+        back: Even.t(Child.t('v)),
+      });
 
-  type direction =
-    | Backward
-    | Forward;
-
-  let splitChildren = (childs, entryChild) => {
+  /**
+   * Removes the base child and splits remaining children into two lists, before
+   * and after the entry child.
+   */
+  let splitChildren = (children, entryChild) => {
     open Node.Infix;
     open ParityList.Infix;
-    let Odd(base, childs) = childs;
-    let rec loop = (frontChilds, backChilds) =>
-      switch (backChilds) {
-      | Empty when base.node =|= entryChild => NoSplit
+    let Odd(base, rest) = children;
+    let rec loop = (front, back) =>
+      switch (back) {
+      | Empty when base.node =|= entryChild => NoSplit({base, rest})
       | Empty => failwith("Entry child not found.")
-      | Even(c1, tail) when c1.node =|= entryChild =>
-        GoForward(base, Even.reverse(frontChilds), c1, tail)
-      | Even(c1, Odd(c2, tail)) when c2.node =|= entryChild =>
-        GoBackward(base, Odd.reverse(frontChilds <:> c1), c2, tail)
-      | Even(c1, Odd(c2, tail)) => loop(frontChilds <:> c1 <.> c2, tail)
+      | Even(child, back) when child.node =|= entryChild =>
+        GoForward({base, front: Even.reverse(front), entry: child, back})
+      | Even(child, Odd(child', back)) when child'.node =|= entryChild =>
+        GoBackward({
+          base,
+          front: Odd.reverse(front <:> child),
+          entry: child',
+          back,
+        })
+      | Even(child, Odd(child', back)) =>
+        loop(front <:> child <.> child', back)
       };
-    loop(Empty, childs);
+    loop(Empty, rest);
   };
 
   let rec bubbleBlossomTree = (node, parent, b) =>
@@ -1092,6 +1125,10 @@ module ModifyBlossom = {
     | Some(parent) when Blossom.eq(parent, b) => node
     | Some(parent) => bubbleBlossomTree(Blossom(parent), parent.parent, b)
     };
+
+  type direction =
+    | Backward
+    | Forward;
 
   /**
    * Swap matched/unmached edges over an alternating path through a blossom
@@ -1115,66 +1152,58 @@ module ModifyBlossom = {
       | Vertex(_) => mates
       };
     /* Figure out how we'll go 'round the blossom. */
-    let loopData =
+    let (moveList, direction, children) =
       switch (splitChildren(b.fields.children, t)) {
-      | NoSplit => None
-      | GoForward(base, frontChilds, entryChild, backChilds) =>
-        let moveList = Odd.concat(backChilds, Odd.make(base));
-        let direction = Forward;
+      | NoSplit(_) => (Empty, Backward, b.fields.children)
+      | GoForward({base, front, entry, back}) =>
+        let moveList = Odd.concat(back, Odd.make(base));
         /* Rotate the list of sub-blossoms to put the new base at the front. */
-        let children =
-          Odd(entryChild, Odd.concat(backChilds, Odd(base, frontChilds)));
-        Some((moveList, direction, children));
-      | GoBackward(base, frontChilds, entryChild, backChilds) =>
-        let moveList = Even.reverse(Even(base, frontChilds));
-        let direction = Backward;
+        let children = Odd(entry, Odd.concat(back, Odd(base, front)));
+        (moveList, Forward, children);
+      | GoBackward({base, front, entry, back}) =>
+        let moveList = Even.reverse(Even(base, front));
         /* Rotate the list of sub-blossoms to put the new base at the front. */
-        let children =
-          Odd(entryChild, Even.concat(backChilds, Even(base, frontChilds)));
-        Some((moveList, direction, children));
+        let children = Odd(entry, Even.concat(back, Even(base, front)));
+        (moveList, Backward, children);
       };
     b.fields.base = v;
-    switch (loopData) {
-    | None => mates
-    | Some((moveList, direction, children)) =>
-      b.fields.children = children;
-      let rec loopToBase = (children, mates, direction) =>
-        switch (children) {
-        | Empty => mates
-        /* Step into the next two sub-blossoms and augment them recursively. */
-        | Even(child, Odd(child', rest)) =>
-          let p =
-            switch (direction) {
-            | Forward => child.endpoint
-            | Backward => Endpoint.reverse(child'.endpoint)
-            };
-          let mates =
-            switch (child.node) {
-            | Blossom(b) => augment(b, Endpoint.toVertex(p), mates)
-            | Vertex(_) => mates
-            };
-          let mates =
-            switch (child'.node) {
-            | Blossom(b) => augment(b, Endpoint.toReverseVertex(p), mates)
-            | Vertex(_) => mates
-            };
-          /* Match the edge connecting those sub-blossoms. */
-          let mates = Mates.Internal.setEdge(mates, Endpoint.toEdge(p));
-          [%log.debug
-            "PAIR";
-            ("v", Endpoint._debug(p));
-            ("w", p->Endpoint.reverse->Endpoint._debug)
-          ];
-          loopToBase(rest, mates, direction);
-        };
-      loopToBase(moveList, mates, direction);
-    };
+    b.fields.children = children;
+    let rec loopToBase = (moveList, mates) =>
+      switch (moveList) {
+      | Empty => mates
+      /* Step into the next two sub-blossoms and augment them recursively. */
+      | Even(child, Odd(child', rest)) =>
+        let p =
+          switch (direction) {
+          | Forward => child.endpoint
+          | Backward => Endpoint.reverse(child'.endpoint)
+          };
+        let mates =
+          switch (child.node) {
+          | Blossom(b) => augment(b, Endpoint.toVertex(p), mates)
+          | Vertex(_) => mates
+          };
+        let mates =
+          switch (child'.node) {
+          | Blossom(b) => augment(b, Endpoint.toReverseVertex(p), mates)
+          | Vertex(_) => mates
+          };
+        /* Match the edge connecting those sub-blossoms. */
+        let mates = Mates.Internal.setEdge(mates, Endpoint.toEdge(p));
+        [%log.debug
+          "PAIR";
+          ("v", p->Endpoint.toVertex->Vertex._debug);
+          ("w", p->Endpoint.toReverseVertex->Vertex._debug)
+        ];
+        loopToBase(rest, mates);
+      };
+    loopToBase(moveList, mates);
   };
 
-  let rec relabelLoopToBase =
+  let rec relabelToBase =
           (childsToBase, nextEndpoint, queue, mates, direction) =>
     switch (childsToBase) {
-    | Odd({node, _}, Empty) => (node, queue, nextEndpoint)
+    | Odd(_, Empty) => (nextEndpoint, queue)
     | Odd({endpoint, _}, Even({endpoint: endpoint', _}, rest)) =>
       Endpoint.toEdge(endpoint).allowable = Allowed;
       Endpoint.toEdge(endpoint').allowable = Allowed;
@@ -1193,7 +1222,7 @@ module ModifyBlossom = {
           Endpoint.reverse(endpoint);
         };
       Endpoint.toEdge(nextEndpoint).allowable = Allowed;
-      relabelLoopToBase(rest, nextEndpoint, queue, mates, direction);
+      relabelToBase(rest, nextEndpoint, queue, mates, direction);
     };
 
   /**
@@ -1244,30 +1273,34 @@ module ModifyBlossom = {
            its label, and relabel sub-blossoms until we reach the base.
            Figure out through which sub-blossom the expanding blossom obtained
            its label initially. */
-        let entryChild =
+        let entryNode =
           Endpoint.toReverseVertex(labelEndpoint).fields.inBlossom;
-        let (childrenToBase, childrenToEntryChild, direction) =
-          switch (splitChildren(b.fields.children, entryChild)) {
-          | NoSplit => failwith("Entry child cannot be the base child.")
-          | GoForward(base, front, entry, back) => (
-              Odd(entry, Odd.concat(back, Odd.make(base))),
-              front,
-              Forward,
-            )
-          | GoBackward(base, front, entry, back) => (
-              Odd(entry, Even.reverse(Even(base, front))),
-              back,
-              Backward,
-            )
+        let (base, p, childrenToEntryChild, queue) =
+          switch (splitChildren(b.fields.children, entryNode)) {
+          /* If the base is the entry child, don't relabel but do process the
+             rest of the children. */
+          | NoSplit({base, rest}) => (base.node, labelEndpoint, rest, queue)
+          | GoForward({base, front, entry, back}) =>
+            let (endpoint, queue) =
+              relabelToBase(
+                Odd(entry, Odd.concat(back, Odd.make(base))),
+                labelEndpoint,
+                queue,
+                mates,
+                Forward,
+              );
+            (base.node, endpoint, front, queue);
+          | GoBackward({base, front, entry, back}) =>
+            let (endpoint, queue) =
+              relabelToBase(
+                Odd(entry, Even.reverse(Even(base, front))),
+                labelEndpoint,
+                queue,
+                mates,
+                Backward,
+              );
+            (base.node, endpoint, back, queue);
           };
-        let (base, queue, p) =
-          relabelLoopToBase(
-            childrenToBase,
-            labelEndpoint,
-            queue,
-            mates,
-            direction,
-          );
         /* Relabel the base T-sub-blossom WITHOUT stepping through to its mate
            (so don't call Label.assignT, call Label.assignTSingle instead.) */
         Node.removeBestEdge(base);

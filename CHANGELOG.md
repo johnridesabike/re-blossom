@@ -1,5 +1,11 @@
 # Re-Blossom Changelog
 
+## 1.0.7
+
+- Updated the function that scans for potential blossoms. It is now more robust 
+  and can handle more complex paths.
+- Fixed a crash on some graphs.
+
 ## 1.0.6
 
 - Fixed a crash on graphs with large blossoms.

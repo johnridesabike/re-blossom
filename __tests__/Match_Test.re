@@ -525,6 +525,8 @@ describe("Nasty cases", () => {
          ])
     );
   });
+});
+describe("More nasty cases", () => {
   test("Blossom with five children.", () => {
     Match.Int.make([
       (9, 8, 30.),
@@ -558,6 +560,37 @@ describe("Nasty cases", () => {
          (9, 8),
        ])
   });
+  test("Scan along a long label path to create a blossom.", () =>
+    Match.Int.make([
+      (10, 6, 30.),
+      (10, 9, 55.),
+      (10, 8, 50.),
+      (6, 3, 10.),
+      (4, 1, 15.),
+      (4, 5, 10.),
+      (9, 1, 40.),
+      (9, 2, 55.),
+      (9, 8, 59.),
+      (1, 2, 40.),
+      (2, 8, 55.),
+      (8, 7, 30.),
+    ])
+    |> Match.toList
+    |> sortResult(compare)
+    |> expect
+    |> toEqual([
+         (1, 2),
+         (2, 1),
+         (3, 6),
+         (4, 5),
+         (5, 4),
+         (6, 3),
+         (7, 8),
+         (8, 7),
+         (9, 10),
+         (10, 9),
+       ])
+  );
 });
 describe("Large data", () => {
   test("Simple large data", () => {
