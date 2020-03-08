@@ -47,7 +47,7 @@
     "bs-platform": "^7.1.1"
   },
   "devDependencies": {
-    "@glennsl/bs-jest": "^0.4.9",
+    "@glennsl/bs-jest": "^0.4.10",
     "benchmark": "^2.1.4",
     "bs-platform": "^7.1.1",
     "edmonds-blossom": "^1.0.0",
