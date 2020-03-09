@@ -191,10 +191,10 @@ let graph = [
 ];
 
 Blossom.Match.Int.make(graph);
-/* [(1, 2)] */
+/* Result: (1, 2) */
 
 Blossom.Match.Int.make(~cardinality=`Max, graph);
-/* [(1, 3), (2, 4)] */
+/* Result: (1, 3), (2, 4) */
 ```
 
 ### Your own types
@@ -206,7 +206,9 @@ To use your own type, first you need a module that conforms to the
 module MyType: {
   type t;
   let cmp: (t, t) => int;
-} = { /* implementation goes here */ };
+} = {
+  /* implementation goes here */
+};
 
 module MyTypeCmp = Belt.Id.MakeComparable(MyType);
 ```
@@ -243,6 +245,11 @@ types.
 
 [Joris van Rantwijk's Python implementation](http://jorisvr.nl/article/maximum-matching)
 was the basis of both the JavaScript version and this Reason version. 
+
+
+## Changelog
+
+[See the CHANGELOG file.](CHANGELOG.md)
 
 ## Development
 
@@ -299,8 +306,17 @@ When reading the code, you may need familiarity with BuckleScript's
 [uncurrying](https://bucklescript.github.io/docs/en/function#solution-guaranteed-uncurrying),
 as well as its map and set structures.
 
+This code uses many terms and ideas from ["Efficient algorithms for finding
+maximum matching in graphs" by Zvi Galil, *ACM Computing Surveys*, 1986]
+(https://doi.org/10.1145/6462.6502). Reading the paper will make this code much
+more understandable.
+
 ## Credits
 
-[Joris van Rantwijk's](http://jorisvr.nl/) Python code was an invaluable
-reference. I can't take any credit for the algorithm itself. It exists thanks to
-many people much smarter than me.
+- [John](https://johnridesa.bike/) - idea and initial work.
+
+- [Joris van Rantwijk](http://jorisvr.nl/) - his Python code was an invaluable
+reference.
+
+I can't take any credit for the algorithm itself. It exists thanks to many
+people much smarter than me.
