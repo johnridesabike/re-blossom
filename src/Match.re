@@ -243,8 +243,6 @@ and vertex('v) = basicNode('v, 'v, vertexFields('v))
  * other blossoms.
  */
 and blossomFields('v) = {
-  /* The blossom's base vertex and the head of its list of children. */
-  mutable base: vertex('v),
   /* A list of the blossom's sub-blossoms, starting with the base and going
      around the blossom. */
   mutable children: ParityList.Odd.t(child('v)),
@@ -351,10 +349,14 @@ module Blossom = {
 module Node = {
   type t('v) = anyNode('v);
 
-  let base =
+  /**
+   * A blossom's base is the vertex at the head of its list of children.
+   */
+  let rec baseVertex =
     fun
     | Vertex(vertex) => vertex
-    | Blossom(blossom) => blossom.fields.base;
+    | Blossom({fields: {children: ParityList.Odd({node, _}, _), _}, _}) =>
+      baseVertex(node);
 
   let eq = (a, b) =>
     switch (a, b) {
@@ -553,7 +555,7 @@ module Label = {
     };
     v.bestEdge = None;
     v.label = label;
-    switch (Mates.Internal.get(mates, Node.base(b))) {
+    switch (Mates.Internal.get(mates, Node.baseVertex(b))) {
     | None => failwith("Needed mate.")
     | Some(matep) =>
       let mate = Endpoint.toVertex(matep);
@@ -1011,7 +1013,6 @@ module AddBlossom = {
       bestEdge: None,
       label: Node.label(baseNode),
       fields: {
-        base: Node.base(baseNode),
         children,
         blossomBestEdges: [],
       },
@@ -1158,7 +1159,6 @@ module ModifyBlossom = {
         let children = Odd(entry, Even.concat(back, Even(base, front)));
         (moveList, Backward, children);
       };
-    b.fields.base = v;
     b.fields.children = children;
     let rec loopToBase = (moveList, mates) =>
       switch (moveList) {
