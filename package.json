@@ -44,12 +44,12 @@
     "bsconfig.json"
   ],
   "peerDependencies": {
-    "bs-platform": "^7.1.1"
+    "bs-platform": "^7.2.2"
   },
   "devDependencies": {
     "@glennsl/bs-jest": "^0.4.10",
     "benchmark": "^2.1.4",
-    "bs-platform": "^7.1.1",
+    "bs-platform": "^7.2.2",
     "edmonds-blossom": "^1.0.0",
     "serve": "^11.3.0"
   },
