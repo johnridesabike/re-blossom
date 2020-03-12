@@ -311,10 +311,9 @@ When reading the code, you may need familiarity with BuckleScript's
 [uncurrying](https://bucklescript.github.io/docs/en/function#solution-guaranteed-uncurrying),
 as well as its map and set structures.
 
-This code uses many terms and ideas from ["Efficient algorithms for finding
-maximum matching in graphs" by Zvi Galil, *ACM Computing Surveys*, 1986]
-(https://doi.org/10.1145/6462.6502). Reading the paper will make this code much
-more understandable.
+This code uses many terms and ideas from
+["Efficient algorithms for finding maximum matching in graphs" by Zvi Galil, *ACM Computing Surveys*, 1986](https://doi.org/10.1145/6462.6502).
+Reading the paper will make this code much more understandable.
 
 ## Credits
 
