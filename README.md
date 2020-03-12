@@ -1,5 +1,10 @@
 # Re-Blossom 🌺
 
+![GitHub package.json version](https://img.shields.io/github/package-json/v/johnridesabike/re-blossom)
+![npm peer dependency version](https://img.shields.io/npm/dependency-version/re-blossom/peer/bs-platform?label=BuckleScript)
+![Node.js CI](https://github.com/johnridesabike/re-blossom/workflows/Node.js%20CI/badge.svg)
+![GitHub](https://img.shields.io/github/license/johnridesabike/re-blossom)
+
 Re-Blossom is a [Reason](https://reasonml.github.io/) implementation of the
 famous [blossom algorithm](https://en.wikipedia.org/wiki/Blossom_algorithm). It
 finds a maximum matching of vertices on general, undirected, weighted graphs.
@@ -129,7 +134,7 @@ vertices as possible.
 
 As you can see, finding the *maximum* weighted matching is often unintuitive.
 Imagine how much more difficult this becomes when you have dozens, or hundreds,
-of people, and every person could be potentially matched with anyone else! 
+of people, and we could potentially match every person with anyone else! 
 
 ## Usage
 

@@ -1,5 +1,11 @@
 # Re-Blossom Changelog
 
+## 1.0.8
+
+- Fixed a bug in the function that scans for potential blossoms.
+- Cleaned up documentation.
+- Updated dependencies.
+
 ## 1.0.7
 
 - Updated the function that scans for potential blossoms. It is now more robust 
