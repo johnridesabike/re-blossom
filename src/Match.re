@@ -73,13 +73,11 @@ module ParityList = {
   module Infix = {
     /**
      * Append an item to an odd list.
-     * (Has an odd number of dots = appends to an odd list.)
      */
     let (<.>) = (l, x) => Even(x, l);
 
     /**
      * Append an item to an even list.
-     * (Has an even number of dots = appends to an even list.)
      */
     let (<:>) = (l, x) => Odd(x, l);
   };
@@ -87,6 +85,8 @@ module ParityList = {
   module Even = {
     open Infix;
     type t('a) = even('a);
+
+    let zero = Empty;
 
     let rec reduceU = (l, ~init, ~f) =>
       switch (l) {
@@ -101,19 +101,17 @@ module ParityList = {
         | Empty => acc
         | Even(a, Odd(b, tail)) => loop(acc <:> a <.> b, tail)
         };
-      loop(Empty, l);
+      loop(zero, l);
     };
 
     let concat = (l1, l2) => {
       let rec loop = (acc, l1, l2) =>
         switch (l1, l2) {
         | (Empty, Empty) => reverse(acc)
-        | (Empty, Even(x, Odd(y, tail))) =>
-          loop(Even(y, Odd(x, acc)), Empty, tail)
-        | (Even(x, Odd(y, tail)), l) =>
-          loop(Even(y, Odd(x, acc)), tail, l)
+        | (Empty as l1, Even(a, Odd(b, l2)))
+        | (Even(a, Odd(b, l1)), l2) => loop(acc <:> a <.> b, l1, l2)
         };
-      loop(Empty, l1, l2);
+      loop(zero, l1, l2);
     };
   };
 
@@ -121,13 +119,12 @@ module ParityList = {
     open Infix;
     type t('a) = odd('a);
 
-    let make = x => Odd(x, Empty);
+    let one = x => Even.zero <:> x;
 
     let rec reduceU = (l, ~init, ~f) =>
       switch (l) {
       | Odd(a, Empty) => f(. init, a)
-      | Odd(a, Even(b, tail)) =>
-        reduceU(tail, ~init=f(. f(. init, a), b), ~f)
+      | Odd(a, Even(b, l)) => reduceU(l, ~init=f(. f(. init, a), b), ~f)
       };
 
     let reverse = (Odd(head, tail)) => {
@@ -136,7 +133,7 @@ module ParityList = {
         | Empty => acc
         | Even(a, Odd(b, tail)) => loop(acc <.> a <:> b, tail)
         };
-      loop(make(head), tail);
+      loop(one(head), tail);
     };
 
     let forEachU = (l, ~f) => reduceU(l, ~init=(), ~f=(. _, x) => f(. x));
@@ -151,17 +148,34 @@ module ParityList = {
     };
 
     let concatEven = (Odd(head, tail), l2) =>
-      Odd(head, Even.concat(tail, l2));
+      Even.concat(tail, l2) <:> head;
 
+    /**
+     * Return the list _up to_, but _not including_, the item where
+     * `f(item) == true`, or return `None` if `f` never returns `true`.
+     * `f` is only applied to _even_ items.
+     */
     let trimToU = (Odd(head, tail), ~f) => {
       let rec loop = (acc, l) =>
         switch (l) {
         | Even(a, _) when f(. a) => Some(reverse(acc))
         | Empty => None
-        | Even(a, Odd(b, l)) => loop(Odd(b, Even(a, acc)), l)
+        | Even(a, Odd(b, l)) => loop(acc <.> a <:> b, l)
         };
-      loop(make(head), tail);
+      loop(one(head), tail);
     };
+
+    /**
+     * Return the list _from_, and _including_, the item where
+     * `f(item) == true`, or return `None` if `f` never returns `true`.
+     * `f` is only applied to _odd_ items.
+     */
+    let rec trimFromU = (l, ~f) =>
+      switch (l) {
+      | Odd(a, _) when f(. a) => Some(l)
+      | Odd(_, Empty) => None
+      | Odd(_, Even(_, l)) => trimFromU(l, ~f)
+      };
   };
 };
 
@@ -527,7 +541,7 @@ module Label = {
     | Blossom(b) =>
       b.label = label;
       b.bestEdge = None;
-    | Vertex(_) => v.bestEdge = None
+    | Vertex(_) => ()
     };
     v.bestEdge = None;
     v.label = label;
@@ -551,7 +565,7 @@ module Label = {
     | Blossom(b) =>
       b.label = label;
       b.bestEdge = None;
-    | Vertex(_) => v.bestEdge = None
+    | Vertex(_) => ()
     };
     v.bestEdge = None;
     v.label = label;
@@ -860,11 +874,11 @@ module AddBlossom = {
    */
   let findConnection = (lastV, nextW, front, back) => {
     open ParityList;
+    open Node.Infix;
     let children = Odd.concatEven(front, Even.reverse(back));
-    if (Node.eq(lastV, nextW)) {
-      Some(children);
-    } else {
-      Odd.trimToU(children, ~f=(. {node, _}) => Node.eq(node, lastV));
+    switch (Odd.trimToU(children, ~f=(. {node, _}) => node =|= lastV)) {
+    | None => Odd.trimFromU(children, ~f=(. {node, _}) => node =|= nextW)
+    | children => children
     };
   };
 
@@ -881,11 +895,7 @@ module AddBlossom = {
     open ParityList;
     let rec loop = (frontPath, backPath) =>
       switch (frontPath, backPath) {
-      | (DeadEnd(lastV, front), DeadEnd(nextW, back)) =>
-        switch (findConnection(lastV, nextW, front, back)) {
-        | Some(children) => NewBlossom(children)
-        | None => AugmentingPath
-        }
+      | (DeadEnd(_, _), DeadEnd(_, _)) => AugmentingPath
       | (DeadEnd(lastV, front) as frontPath, FoundChild(nextW, back)) =>
         switch (findConnection(lastV, nextW, front, back)) {
         /* The first front child was a SingleS; the back traced around to it. */
@@ -916,8 +926,8 @@ module AddBlossom = {
     let initialV = edge.i.fields.inBlossom;
     loop(
       /* Manually add the i child to connect the two lists. */
-      FoundChild(initialV, Odd.make({node: initialV, endpoint: I(edge)})),
-      FoundChild(edge.j.fields.inBlossom, Empty),
+      FoundChild(initialV, Odd.one({node: initialV, endpoint: I(edge)})),
+      FoundChild(edge.j.fields.inBlossom, Even.zero),
     );
   };
 
@@ -1102,14 +1112,14 @@ module ModifyBlossom = {
       | Even(child, Odd(child', back)) when child'.node =|= entryChild =>
         GoBackward({
           base,
-          front: Odd.reverse(front <:> child),
+          front: front <:> child |> Odd.reverse,
           entry: child',
           back,
         })
       | Even(child, Odd(child', back)) =>
         loop(front <:> child <.> child', back)
       };
-    loop(Empty, rest);
+    loop(Even.zero, rest);
   };
 
   let rec bubbleBlossomTree = (node, parent, b) =>
@@ -1135,6 +1145,7 @@ module ModifyBlossom = {
       ("Vertex", Vertex._debug(v));
       ("Mates", Mates._debug(mates))
     ];
+    open ParityList.Infix;
     /* Bubble up through the blossom tree from from the vertex to an immediate
        sub-blossom of `b`. */
     let t = bubbleBlossomTree(Vertex(v), v.parent, b);
@@ -1147,16 +1158,16 @@ module ModifyBlossom = {
     /* Figure out how we'll go 'round the blossom. */
     let (moveList, direction, children) =
       switch (splitChildren(b.fields.children, t)) {
-      | NoSplit(_) => (Empty, Backward, b.fields.children)
+      | NoSplit(_) => (Even.zero, Backward, b.fields.children)
       | GoForward({base, front, entry, back}) =>
-        let moveList = Odd.concat(back, Odd.make(base));
+        let moveList = Odd.concat(back, Odd.one(base));
         /* Rotate the list of sub-blossoms to put the new base at the front. */
-        let children = Odd(entry, Odd.concat(back, Odd(base, front)));
+        let children = Odd.concat(back, front <:> base) <:> entry;
         (moveList, Forward, children);
       | GoBackward({base, front, entry, back}) =>
-        let moveList = Even.reverse(Even(base, front));
+        let moveList = front <.> base |> Even.reverse;
         /* Rotate the list of sub-blossoms to put the new base at the front. */
-        let children = Odd(entry, Even.concat(back, Even(base, front)));
+        let children = Even.concat(back, front <.> base) <:> entry;
         (moveList, Backward, children);
       };
     b.fields.children = children;
@@ -1232,6 +1243,7 @@ module ModifyBlossom = {
       ("Endstage", _debug_endstage);
       ("Children", Child._debug(b.fields.children))
     ];
+    open ParityList.Infix;
     /* Convert sub-blossoms into top-level blossoms. */
     let queue =
       Odd.reduceU(b.fields.children, ~init=queue, ~f=(. queue, child) =>
@@ -1275,7 +1287,7 @@ module ModifyBlossom = {
           | GoForward({base, front, entry, back}) =>
             let (endpoint, queue) =
               relabelToBase(
-                Odd(entry, Odd.concat(back, Odd.make(base))),
+                Odd.concat(back, Odd.one(base)) <:> entry,
                 labelEndpoint,
                 queue,
                 mates,
@@ -1285,7 +1297,7 @@ module ModifyBlossom = {
           | GoBackward({base, front, entry, back}) =>
             let (endpoint, queue) =
               relabelToBase(
-                Odd(entry, Even.reverse(Even(base, front))),
+                front <.> base |> Even.reverse <:> entry,
                 labelEndpoint,
                 queue,
                 mates,
