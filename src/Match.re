@@ -785,18 +785,18 @@ module Graph = {
         };
       }
     );
-    Belt.List.forEachU(graph.blossoms, (. b) =>
-      switch (b) {
-      | {parent: None, label: SingleS | S(_), _} =>
+    Belt.List.forEachU(graph.blossoms, (. b) => {
+      b.dualVar = {
+        switch (b) {
         /* top-level S-blossom: z = z + delta */
-        b.dualVar = b.dualVar +. delta
-      | {parent: None, label: T(_), _} =>
+        | {parent: None, label: SingleS | S(_), _} => b.dualVar +. delta
         /* top-level T-blossom: z = z - delta */
-        b.dualVar = b.dualVar -. delta
-      | {parent: Some(_), _}
-      | {label: Free, _} => ()
+        | {parent: None, label: T(_), _} => b.dualVar -. delta
+        | {parent: Some(_), _}
+        | {label: Free, _} => b.dualVar
+        };
       }
-    );
+    });
   };
 };
 
@@ -1060,9 +1060,11 @@ module AddBlossom = {
         | _ => bestEdge
         }
       );
-    switch (bestEdge) {
-    | Some(edge) => b.bestEdge = Some(edge)
-    | None => b.bestEdge = None
+    b.bestEdge = {
+      switch (bestEdge) {
+      | Some(edge) => Some(edge)
+      | None => None
+      };
     };
     b.fields.blossomBestEdges = bestEdges;
     queue;
