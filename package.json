@@ -1,6 +1,6 @@
 {
   "name": "re-blossom",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A Reason implementation of the blossom maximum-matching algorithm",
   "scripts": {
     "build": "bsb -make-world",
