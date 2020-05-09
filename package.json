@@ -9,7 +9,7 @@
     "pretest": "npm run build",
     "test": "jest",
     "test:watch": "jest --watchAll",
-    "bench": "node ./lib/js/__benchmarks__/Init.bs.js",
+    "bench": "npm run build && node ./lib/js/__benchmarks__/Node.bs.js",
     "browser": "serve .",
     "preversion": "npm test",
     "postversion": "git push && git push --tags"

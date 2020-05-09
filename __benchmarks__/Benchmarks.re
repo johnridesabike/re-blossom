@@ -1,4 +1,4 @@
-/**
+/*******************************************************************************
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,11 +20,12 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- */
+ ******************************************************************************/
 open Belt;
 
 module JsBlossom = {
   type t = (. array((int, int, float))) => array(int);
+  [@bs.module] external make: t = "edmonds-blossom";
 
   /* Turn a list of lists into a list of arrays for JS */
 
@@ -75,6 +76,8 @@ module JsBlossom = {
 
 module BenchmarkJs = {
   type t;
+  [@bs.module "benchmark"] [@bs.new] external make: string => t = "Suite";
+
   module Stats = {
     type t = {
       rme: float,
@@ -112,124 +115,69 @@ let formatResult = (BenchmarkJs.Benchmark.{name, hz, _}, maxHz) => {
   (percentDiff(hz, maxHz)->Js.String.make ++ "% slower", name);
 };
 
-module NodeLogger = NodeLogger;
-/* This makes it easy to import in the browser. */
-module BrowserLogger = {
-  include BrowserLogger;
-};
-
-module type Logger = {
-  let info: (string, string) => unit;
-  let infoWithData2: (string, string, (string, 'a), (string, 'b)) => unit;
-  let infoWithData3:
-    (string, string, (string, 'a), (string, 'b), (string, 'c)) => unit;
-  let infoWithData6:
-    (
-      string,
-      string,
-      (string, 'a),
-      (string, 'b),
-      (string, 'c),
-      (string, 'd),
-      (string, 'e),
-      (string, 'f)
-    ) =>
-    unit;
-};
-
-let make: ((module Logger), BenchmarkJs.t, JsBlossom.t) => unit =
-  (logger, suite, jsBlossom) => {
-    module Logger = (val logger);
-    BenchmarkJs.(
-      suite
-      ->add("Re-Blossom: Integers", () =>
-          List.forEachU(BenchData.Int.data, (. x) => Match.Int.make(x))
+let make = (suite, jsBlossom) => {
+  BenchmarkJs.(
+    suite
+    ->add("Re-Blossom: Integers", () =>
+        List.forEachU(BenchData.Int.data, (. x) => Match.Int.make(x))
+      )
+    ->add("JS Blossom: Integers", () =>
+        List.forEachU(BenchData.Int.data, (. x) =>
+          jsBlossom(. List.toArray(x))
         )
-      ->add("JS Blossom: Integers", () =>
-          List.forEachU(BenchData.Int.data, (. x) =>
-            jsBlossom(. List.toArray(x))
-          )
-        )
-      ->add("Re-Blossom: Strings ", () =>
-          List.forEachU(BenchData.String.data, (. x) => Match.String.make(x))
-        )
-      ->add("JS Blossom: Strings ", () => {
-          List.forEachU(
-            BenchData.String.data,
-            (. x) => {
-              let (intMap, vertexMap) =
-                JsBlossom.makeKeys(x, (module BenchData.String.Cmp));
-              let y = JsBlossom.graphToIntGraph(x, vertexMap);
-              let mates = jsBlossom(. y);
-              JsBlossom.intResultToResult(mates, intMap);
-            },
-          )
-        })
-      ->add("Re-Blossom: Variants", () => {
-          List.forEachU(BenchData.Person.data, (. x) =>
-            Match.make(
-              ~id=(module BenchData.Person.Cmp),
-              ~cmp=BenchData.Person.cmp,
-              x,
-            )
-          )
-        })
-      ->add("JS Blossom: Variants", () => {
-          List.forEachU(
-            BenchData.Person.data,
-            (. x) => {
-              let (intMap, vertexMap) =
-                JsBlossom.makeKeys(x, (module BenchData.Person.Cmp));
-              let y = JsBlossom.graphToIntGraph(x, vertexMap);
-              let mates = jsBlossom(. y);
-              JsBlossom.intResultToResult(mates, intMap);
-            },
-          )
-        })
-      ->on(`start, ({currentTarget, _}) =>
-          Logger.infoWithData2(
-            __MODULE__,
-            "Beginning benchmark",
-            ("name", currentTarget->Suite.name),
-            ("tests", currentTarget->Suite.length),
-          )
-        )
-      ->on(`cycle, ({target, _}) =>
-          Logger.info(__MODULE__, target->Js.String.make)
-        )
-      ->on(
-          `complete,
-          ({currentTarget, _}) => {
-            open Benchmark;
-            let results =
-              currentTarget
-              ->Suite.length
-              ->List.makeBy(x => Js.String.make(x))
-              ->List.keepMap(Js.Dict.get(currentTarget))
-              ->List.sort((a, b) => compare(b.hz, a.hz));
-            switch (results) {
-            | [] => Logger.info(__MODULE__, "No results? :(")
-            | [first, second, third, fourth, fifth, sixth] =>
-              Logger.infoWithData6(
-                __MODULE__,
-                "Percenage comparison",
-                ("   Fastest", first.name),
-                formatResult(second, first.hz),
-                formatResult(third, first.hz),
-                formatResult(fourth, first.hz),
-                formatResult(fifth, first.hz),
-                formatResult(sixth, first.hz),
-              )
-            | [{name, hz: maxHz, _}, ...results] =>
-              Js.log("  Fastest  : " ++ name);
-              List.forEach(results, result => {
-                formatResult(result, maxHz)->Js.log
-              });
-            };
-            Logger.info(__MODULE__, "Done");
+      )
+    ->add("Re-Blossom: Strings ", () =>
+        List.forEachU(BenchData.String.data, (. x) => Match.String.make(x))
+      )
+    ->add("JS Blossom: Strings ", () => {
+        List.forEachU(
+          BenchData.String.data,
+          (. x) => {
+            let (intMap, vertexMap) =
+              JsBlossom.makeKeys(x, (module BenchData.String.Cmp));
+            let y = JsBlossom.graphToIntGraph(x, vertexMap);
+            let mates = jsBlossom(. y);
+            JsBlossom.intResultToResult(mates, intMap);
           },
         )
-      ->run({async: true})
-    );
-  };
+      })
+    ->on(
+        `start,
+        ({currentTarget, _}) => {
+          Js.Console.info("Beginning benchmark");
+          Js.Console.info2("name", currentTarget->Suite.name);
+          Js.Console.info2("tests", currentTarget->Suite.length);
+        },
+      )
+    ->on(`cycle, ({target, _}) => Js.Console.info(target->Js.String.make))
+    ->on(
+        `complete,
+        ({currentTarget, _}) => {
+          open Benchmark;
+          let results =
+            currentTarget
+            ->Suite.length
+            ->List.makeBy(x => Js.String.make(x))
+            ->List.keepMap(Js.Dict.get(currentTarget))
+            ->List.sort((a, b) => compare(b.hz, a.hz));
+          switch (results) {
+          | [] => Js.Console.info("No results? :(")
+          | [first, second, third, fourth] =>
+            Js.Console.info("Percenage comparison");
+            Js.Console.info(("Fastest", first.name));
+            Js.Console.info(formatResult(second, first.hz));
+            Js.Console.info(formatResult(third, first.hz));
+            Js.Console.info(formatResult(fourth, first.hz));
+          | [{name, hz: maxHz, _}, ...results] =>
+            Js.log("  Fastest  : " ++ name);
+            List.forEach(results, result => {
+              formatResult(result, maxHz)->Js.log
+            });
+          };
+          Js.Console.info("Done");
+        },
+      )
+    ->run({async: true})
+  );
+};
 let default = make;

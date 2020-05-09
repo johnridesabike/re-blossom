@@ -47,12 +47,12 @@
 <script src="../node_modules/edmonds-blossom/app/blossom.js"></script>
 <script type=module>
     var jsBlossom = module.exports;
-    import runBenchmark, {BrowserLogger} from "../lib/es6_global/__benchmarks__/Benchmarks.bs.js";
+    import runBenchmark from "../lib/es6_global/__benchmarks__/Benchmarks.bs.js";
 
     function benchmark(event) {
         event.preventDefault();
         var suite = Benchmark.Suite("Re-Blossom vs JS Blossom");
-        runBenchmark(BrowserLogger, suite, jsBlossom);
+        runBenchmark(suite, jsBlossom);
     }
 
     document.querySelector("#benchmark").onclick = benchmark;

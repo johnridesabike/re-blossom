@@ -1,4 +1,4 @@
-/**
+/*******************************************************************************
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,7 +20,7 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- */
+ ******************************************************************************/
 module Int = {
   let large = [
     (0, 1, 37.333333333333336),
@@ -321,6 +321,7 @@ module String =
     let cmp: (string, string) => int = compare;
   });
 
+/*
 module PersonType = {
   type t =
     | Mary
@@ -385,6 +386,7 @@ module PersonType = {
 };
 
 module Person = Make(PersonType);
+*/
 
 let default = () =>
   Belt.List.forEachU(Int.data, (. data) => Match.Int.make(data));

@@ -1,4 +1,4 @@
-/**
+/*******************************************************************************
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,18 +20,14 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- */
-
-/**
- * This is its own module to make it easier for us to load the same scripts in a
- * browser or in Node.
- */
-[@bs.module]
-external jsBlossom: Benchmarks.JsBlossom.t = "edmonds-blossom";
-
-[@bs.module "benchmark"] [@bs.new]
-external makeSuite: string => Benchmarks.BenchmarkJs.t = "Suite";
-
-let suite = makeSuite("Re-Blossom vs JS Blossom");
-
-Benchmarks.make((module NodeLogger), suite, jsBlossom);
+ ******************************************************************************/
+module JsBlossom: {
+  type t = (. array((int, int, float))) => array(int);
+  [@bs.module] external make: t = "edmonds-blossom";
+};
+module BenchmarkJs: {
+  type t;
+  [@bs.module "benchmark"] [@bs.new] external make: string => t = "Suite";
+};
+let make: (BenchmarkJs.t, JsBlossom.t) => unit;
+let default: (BenchmarkJs.t, JsBlossom.t) => unit;
