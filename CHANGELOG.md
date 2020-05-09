@@ -1,5 +1,17 @@
 # Re-Blossom Changelog
 
+## 1.1
+- Replaced `Belt.Id.comparable` with a custom `comparable` type.
+- Added `Match.MakeComparable` and `Match.MakeComparableU` functors.
+- Added `Match.comparable` and `Match.comparableU` functions.
+- Added `Match.unsafeComparableFromBelt` and `Match.unsafeComparableFromBeltU`
+  functions.
+- `Match.make` no longer requires the `cmp` function separate from the `id`.
+- Improved performance.
+- Removed dependency on `Belt.List`.
+- Added types `Match.String.t` and `Match.Int.t`.
+- Updated documentation.
+
 ## 1.0.8
 
 - Fixed a bug in the function that scans for potential blossoms.

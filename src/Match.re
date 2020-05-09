@@ -1,4 +1,4 @@
-/**
+/*******************************************************************************
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,11 +20,10 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- */
-/*******************************************************************************
- * Weighted maximum matching in general graphs.
  ******************************************************************************/
-/**
+/*******************************************************************************
+                   Weighted maximum matching in general graphs
+
   This code is based on a Python implementation by Joris van Rantwijk, who had
   consulted a C implementation by Ed Rothberg.
 
@@ -40,7 +39,7 @@
   > Many terms used in the comments (sub-blossom, T-vertex) come from the paper
   > by Galil; read the paper before reading this code.
 
-  Thanks to Reason's strong typing and some clever ADTs, this version of the
+  Thanks to Reason's type system and some clever ADTs, this version of the
   algorithm is almost entirely safe. Yet, there remain a few exceptional
   situations that are difficult to represent on a type level.
 
@@ -54,7 +53,7 @@
 
   This code uses features from the BuckleScript compiler to output performant
   JavaScript. It will require modification to compile on other platforms.
- */
+ ******************************************************************************/
 /*******************************************************************************
  * Part I: The types
  ******************************************************************************/
@@ -74,12 +73,12 @@ module ParityList = {
     /**
      * Append an item to an odd list.
      */
-    let (<.>) = (l, x) => Even(x, l);
+    let (<.>) = (tail, head) => Even(head, tail);
 
     /**
      * Append an item to an even list.
      */
-    let (<:>) = (l, x) => Odd(x, l);
+    let (<:>) = (tail, head) => Odd(head, tail);
   };
 
   module Even = {
@@ -88,11 +87,11 @@ module ParityList = {
 
     let zero = Empty;
 
-    let rec reduceU = (l, ~init, ~f) =>
+    let rec reduce = (l, ~init, ~f) =>
       switch (l) {
       | Empty => init
       | Even(a, Odd(b, tail)) =>
-        reduceU(tail, ~init=f(. f(. init, a), b), ~f)
+        reduce(tail, ~init=f(. f(. init, a), b), ~f)
       };
 
     let reverse = l => {
@@ -121,10 +120,10 @@ module ParityList = {
 
     let one = x => Even.zero <:> x;
 
-    let rec reduceU = (l, ~init, ~f) =>
-      switch (l) {
-      | Odd(a, Empty) => f(. init, a)
-      | Odd(a, Even(b, l)) => reduceU(l, ~init=f(. f(. init, a), b), ~f)
+    let rec reduce = (Odd(a, tail), ~init, ~f) =>
+      switch (tail) {
+      | Empty => f(. init, a)
+      | Even(b, tail) => reduce(tail, ~init=f(. f(. init, a), b), ~f)
       };
 
     let reverse = (Odd(head, tail)) => {
@@ -136,13 +135,20 @@ module ParityList = {
       loop(one(head), tail);
     };
 
-    let forEachU = (l, ~f) => reduceU(l, ~init=(), ~f=(. _, x) => f(. x));
+    let rec forEach = (Odd(a, tail), ~f) =>
+      switch (tail) {
+      | Empty => f(. a)
+      | Even(b, tail) =>
+        f(. a);
+        f(. b);
+        forEach(tail, ~f);
+      };
 
     let concat = (l1, l2) => {
-      let rec loop = (acc, l) =>
-        switch (l) {
-        | Odd(a, Empty) => acc <.> a |> Even.reverse
-        | Odd(a, Even(b, tail)) => loop(acc <.> a <:> b, tail)
+      let rec loop = (acc, Odd(a, tail)) =>
+        switch (tail) {
+        | Empty => acc <.> a |> Even.reverse
+        | Even(b, tail) => loop(acc <.> a <:> b, tail)
         };
       loop(reverse(l1), l2);
     };
@@ -155,7 +161,7 @@ module ParityList = {
      * `f(item) == true`, or return `None` if `f` never returns `true`.
      * `f` is only applied to _even_ items.
      */
-    let trimToU = (Odd(head, tail), ~f) => {
+    let trimTo = (Odd(head, tail), ~f) => {
       let rec loop = (acc, l) =>
         switch (l) {
         | Even(a, _) when f(. a) => Some(reverse(acc))
@@ -170,11 +176,11 @@ module ParityList = {
      * `f(item) == true`, or return `None` if `f` never returns `true`.
      * `f` is only applied to _odd_ items.
      */
-    let rec trimFromU = (l, ~f) =>
+    let rec trimFrom = (l, ~f) =>
       switch (l) {
       | Odd(a, _) when f(. a) => Some(l)
       | Odd(_, Empty) => None
-      | Odd(_, Even(_, l)) => trimFromU(l, ~f)
+      | Odd(_, Even(_, l)) => trimFrom(l, ~f)
       };
   };
 };
@@ -189,12 +195,14 @@ type allowable =
   | Allowed
   | NotAllowed;
 
-type graph('v) = {
+type graph('v, 'id) = {
   vertices: list(vertex('v)),
   mutable blossoms: list(blossom('v)),
+  mutable nextBlossom: int,
   maxWeight: float,
   edges: list(edge('v)),
-  vertexSize: int /* A cached size of the vertices list. */
+  vertexSize: int, /* A cached size of the vertices list. */
+  cmp: Belt.Id.cmp('v, 'id),
 }
 /**
  * Edges represent a weighted connection between two vertices.
@@ -265,7 +273,11 @@ and blossomFields('v) = {
   /* We're using an association list to map nodes to edges. There are
      probably more performant structures we could use, like maps, but this
      is uncomplicated and works. */
-  mutable blossomBestEdges: list((anyNode('v), edge('v))),
+  mutable blossomBestEdges: list(blossomBestEdge('v)),
+}
+and blossomBestEdge('v) = {
+  w: anyNode('v),
+  edge: edge('v),
 }
 and blossom('v) = basicNode('v, int, blossomFields('v))
 and child('v) = {
@@ -345,7 +357,7 @@ module Endpoint = {
 module Vertex = {
   type t('v) = vertex('v);
 
-  /* We can use reference equality (===) even though we don't know the vertex
+  /* We can use referential equality (===) even though we don't know the vertex
      types because they never change after the graph is created. */
   let eq: (t('v), t('v)) => bool = (a, b) => a.content === b.content;
 
@@ -386,28 +398,6 @@ module Node = {
     | Vertex(_) => false
     };
 
-  let setParent = (node, ~b) =>
-    switch (node) {
-    | Vertex(vertex) => vertex.parent = Some(b)
-    | Blossom(blossom) => blossom.parent = Some(b)
-    };
-
-  let bestEdge =
-    fun
-    | Vertex({bestEdge, _})
-    | Blossom({bestEdge, _}) => bestEdge;
-
-  let setBestEdge = (node, ~edge) =>
-    switch (node) {
-    | Vertex(v) => v.bestEdge = Some(edge)
-    | Blossom(b) => b.bestEdge = Some(edge)
-    };
-
-  let removeBestEdge =
-    fun
-    | Vertex(v) => v.bestEdge = None
-    | Blossom(b) => b.bestEdge = None;
-
   let label =
     fun
     | Vertex({label, _})
@@ -427,22 +417,20 @@ module Node = {
      * Reduce over the leaves of a node. Leaves are the vertices in a blossom's
      * children, as well as the vertices in any of its sub-blossom's children.
      */
-    let rec reduceU = (b, ~init, ~f) =>
+    let rec reduce = (b, ~init, ~f) =>
       switch (b) {
       | Vertex(vertex) => f(. init, vertex)
       | Blossom({fields: {children, _}, _}) =>
-        ParityList.Odd.reduceU(children, ~init, ~f=(. init, child) =>
-          reduceU(child.node, ~init, ~f)
+        ParityList.Odd.reduce(children, ~init, ~f=(. init, child) =>
+          reduce(child.node, ~init, ~f)
         )
       };
 
-    let toList = (~init=[], b) =>
-      reduceU(b, ~init, ~f=(. leaves, v) => [v, ...leaves]);
-
-    let forEachU = (b, ~f) => reduceU(b, ~init=(), ~f=(. _, v) => f(. v));
+    let toList = (b, ~init) =>
+      reduce(b, ~init, ~f=(. leaves, v) => [v, ...leaves]);
 
     let _debug = b =>
-      b->toList->Belt.List.map(Vertex._debug)->Belt.List.toArray;
+      b->toList(~init=[])->Belt.List.map(Vertex._debug)->Belt.List.toArray;
   };
 };
 
@@ -450,7 +438,7 @@ module Child = {
   type t('v) = child('v);
 
   let _debug = c =>
-    ParityList.Odd.reduceU(c, ~init=[||], ~f=(. acc, {node, endpoint}) =>
+    ParityList.Odd.reduce(c, ~init=[||], ~f=(. acc, {node, endpoint}) =>
       Belt.Array.concat(
         acc,
         [|(Node._debug(node), Endpoint._debug(endpoint))|],
@@ -459,62 +447,32 @@ module Child = {
 };
 
 module Mates = {
-  /* Maps vertices to remote endpoints of their attached edges. */
-  type t('v, 'id) = Belt.Map.t('v, Endpoint.t('v), 'id);
+  /**
+   * Maps vertices to remote endpoints of their attached edges.
+   * */
+  type t('v, 'id) = Belt.Map.Dict.t('v, Endpoint.t('v), 'id);
 
-  module Internal = {
-    let make = Belt.Map.make;
+  let empty = Belt.Map.Dict.empty;
 
-    let get = (mates, v) => Belt.Map.get(mates, v.content);
+  let get = (mates, v, ~cmp) => Belt.Map.Dict.get(mates, v.content, ~cmp);
 
-    let setEdge = (mates, edge) =>
-      mates
-      ->Belt.Map.set(edge.i.content, J(edge))
-      ->Belt.Map.set(edge.j.content, I(edge));
+  let setEdge = (mates, edge, ~cmp) =>
+    mates
+    ->Belt.Map.Dict.set(edge.i.content, J(edge), ~cmp)
+    ->Belt.Map.Dict.set(edge.j.content, I(edge), ~cmp);
 
-    let set = (mates, v, p) => Belt.Map.set(mates, v.content, p);
+  let set = (mates, v, p, ~cmp) =>
+    Belt.Map.Dict.set(mates, v.content, p, ~cmp);
 
-    let has = (mates, v) => Belt.Map.has(mates, v.content);
-  };
+  let has = (mates, v, ~cmp) => Belt.Map.Dict.has(mates, v.content, ~cmp);
 
   let exportEndpoint = p => Endpoint.toVertex(p).content;
 
-  /* Public functions */
-
-  let get = (mates, v) =>
-    switch (Belt.Map.get(mates, v)) {
-    | None => None
-    | Some(p) => Some(exportEndpoint(p))
-    };
-
-  let reduceU = (mates, ~init, ~f) =>
-    Belt.Map.reduceU(mates, init, (. acc, v1, p) =>
-      f(. acc, v1, exportEndpoint(p))
-    );
-
-  let reduce = (mates, ~init, ~f) =>
-    reduceU(mates, ~init, ~f=(. acc, v1, v2) => f(acc, v1, v2));
-
-  let forEachU = (mates, ~f) =>
-    Belt.Map.forEachU(mates, (. v1, p) => f(. v1, exportEndpoint(p)));
-
-  let forEach = (mates, ~f) => forEachU(mates, ~f=(. v1, v2) => f(v1, v2));
-
-  let toList = reduce(~init=[], ~f=(acc, v1, v2) => [(v1, v2), ...acc]);
-
-  let toMap = mates =>
-    Belt.(
-      Map.reduceU(
-        mates, Map.make(~id=Map.getId(mates)), (. acc, vertex, mate) =>
-        Map.set(acc, vertex, exportEndpoint(mate))
-      )
-    );
-
-  let isEmpty = Belt.Map.isEmpty;
-
-  let has = Belt.Map.has;
-
-  let _debug = mates => mates |> toList |> Belt.List.toArray;
+  let _debug = mates =>
+    Belt.Map.Dict.reduceU(mates, [], (. acc, a, b) =>
+      [(a, exportEndpoint(b)), ...acc]
+    )
+    |> Belt.List.toArray;
 };
 
 module Label = {
@@ -552,7 +510,7 @@ module Label = {
    * Label a vertex T, label its mate S, and add its mate's inBlossom's children
    * to the queue.
    */
-  let assignT = (~v, ~p, ~mates) => {
+  let assignT = (~v, ~p, ~mates, ~queue, ~cmp) => {
     let b = v.fields.inBlossom;
     [%log.debug
       "assignLabel";
@@ -569,11 +527,11 @@ module Label = {
     };
     v.bestEdge = None;
     v.label = label;
-    switch (Mates.Internal.get(mates, Node.baseVertex(b))) {
+    switch (Mates.get(mates, Node.baseVertex(b), ~cmp)) {
     | None => failwith("Needed mate.")
     | Some(matep) =>
       let mate = Endpoint.toVertex(matep);
-      assignS(~v=mate, ~label=S(Endpoint.reverse(matep)));
+      assignS(~v=mate, ~label=S(Endpoint.reverse(matep)), ~queue);
     };
   };
 
@@ -596,36 +554,72 @@ module Label = {
  * Part III: Let's start making a graph
  ******************************************************************************/
 
+module RawEdge: {
+  type t('v) = pri | Valid('v, 'v);
+  let make: ('v, 'v, ~cmp: (. 'v, 'v) => int) => option(t('v));
+  let makeCmp: ((. 'v, 'v) => int) => (. t('v), t('v)) => int;
+} = {
+  type t('v) =
+    | Valid('v, 'v);
+
+  /**
+   * It's important that edges are always in the same order.
+   */
+  let makeRawEdge = (i, j, ~cmp) =>
+    switch (cmp(. i, j)) {
+    | 0 => None
+    | x when x > 0 => Some(Valid(i, j))
+    | _ => Some(Valid(j, i))
+    };
+  /* Aliasing `make` and `makeRawEdge` for better JavaScript debugging. */
+  let make = makeRawEdge;
+
+  let makeCmp = vertexCmp =>
+    (. Valid(a, b), Valid(y, z)) =>
+      switch (vertexCmp(. a, y), vertexCmp(. b, z)) {
+      | (0, 0) => 0
+      | (c, d) =>
+        switch (c + d) {
+        | 0 => c
+        | e => e
+        }
+      };
+};
+
+/* The `comparable` type is a thin wrapper on top of `Belt.Id.comparable.` We're
+   creating our own signed comparison function to avoid digging into Belt's
+   undocumented internals.
+   We need to do this in order to create the Edge comparable and validate edges
+   while creating the graph. Even though it's only used inside the function that
+   constructs the graph, it's more performant to initialize the module
+   beforehand. */
+
+type internalCmp('v, 'id) = (. 'v, 'v) => int;
+
+type internalEdgeCmp('v, 'id, 'vId) = Belt.Id.cmp(RawEdge.t('v), 'id);
+
+module type Comparable = {
+  type t;
+  type identity;
+  type edgeIdentity;
+  let cmp: internalCmp(t, identity);
+  let edgeCmp: internalEdgeCmp(t, edgeIdentity, identity);
+  module BeltCmp:
+    Belt.Id.Comparable with type t = t and type identity = identity;
+};
+
+type comparable('v, 'id) = (module Comparable with
+                               type identity = 'id and type t = 'v);
+
 module Graph = {
   /**
    * Turn the raw input into a recursive graph.
-   * Compared to similar algorithms, this is the most computationally expensive
-   * part of this implementation.
    */
-  let makeGraph = (type v, rawEdges, ~id: Belt.Id.comparable(v, 'id), ~cmp) => {
+  let makeGraph = (type v, type id, rawEdges, ~id: comparable(v, id)) => {
     /* We need to be able to validate the input and identify duplicate vertices
-       and edges. This set and map will help us do it efficiently. */
-    let cmpU = (. a, b) => cmp(a, b);
-    /* Create a set of tuples to store the pairs of vertices in each edge. */
-    module EdgeCmp =
-      Belt.Id.MakeComparableU({
-        type t = (v, v);
-        /* This only works if the vertices are always in the same order.
-           See `edge'` below. */
-        let cmp =
-          (. (a, b), (y, z)) =>
-            switch (cmpU(. a, y), cmpU(. b, z)) {
-            | (0, 0) => 0
-            | (c, d) =>
-              switch (c + d) {
-              | 0 => c
-              | e => e
-              }
-            };
-      });
-    let edgeSet = Belt.Set.make(~id=(module EdgeCmp));
-    let vertexMap = Belt.Map.make(~id);
-
+       and edges. We use a Map and Set to do this efficiently. */
+    module M = (val id);
+    let cmp = M.BeltCmp.cmp;
     let rec loop =
             (
               ~rawEdges,
@@ -638,17 +632,26 @@ module Graph = {
             ) =>
       switch (rawEdges) {
       | [] =>
-        Belt.List.forEachU(vertices, (. v) => v.dualVar = maxWeight);
-        {vertices, blossoms: [], maxWeight, edges, vertexSize};
-      | [(iId, jId, weight), ...rawEdges] =>
-        let edgeComparison = cmpU(. iId, jId);
-        /* To avoid duplicates, this ensures they're always ordered the same. */
-        let edge' =
-          switch (edgeComparison) {
-          | 1 => (iId, jId)
-          | _ => (jId, iId)
-          };
-        if (edgeComparison == 0 || Belt.Set.has(edgeSet, edge')) {
+        let rec setMaxWeight = (
+          fun
+          | [v, ...rest] => {
+              v.dualVar = maxWeight;
+              setMaxWeight(rest);
+            }
+          | [] => {
+              vertices,
+              blossoms: [],
+              maxWeight,
+              edges,
+              vertexSize,
+              nextBlossom: 0,
+              cmp,
+            }
+        );
+        setMaxWeight(vertices);
+      | [(iContent, jContent, weight), ...rawEdges] =>
+        switch (RawEdge.make(iContent, jContent, ~cmp=M.cmp)) {
+        | None =>
           loop(
             ~rawEdges,
             ~edges,
@@ -657,12 +660,26 @@ module Graph = {
             ~vertexMap,
             ~vertexSize,
             ~maxWeight,
-          );
-        } else {
+          )
+        | Some(rawEdge)
+            when Belt.Set.Dict.has(edgeSet, rawEdge, ~cmp=M.edgeCmp) =>
+          loop(
+            ~rawEdges,
+            ~edges,
+            ~edgeSet,
+            ~vertices,
+            ~vertexMap,
+            ~vertexSize,
+            ~maxWeight,
+          )
+        | Some(RawEdge.Valid(iContent, jContent) as rawEdge) =>
           let maxWeight = max(maxWeight, weight);
-          let edgeSet = Belt.Set.add(edgeSet, edge');
+          let edgeSet = Belt.Set.Dict.add(edgeSet, rawEdge, ~cmp=M.edgeCmp);
           /* See if `i` or `j` are already created. If they are, update them. */
-          switch (Belt.Map.(get(vertexMap, iId), get(vertexMap, jId))) {
+          switch (
+            Belt.Map.Dict.get(vertexMap, iContent, ~cmp),
+            Belt.Map.Dict.get(vertexMap, jContent, ~cmp),
+          ) {
           | (Some(i), Some(j)) =>
             let edge = {i, j, weight, allowable: NotAllowed};
             i.fields.neighbors = [J(edge), ...i.fields.neighbors];
@@ -679,7 +696,7 @@ module Graph = {
           | (Some(i), None) =>
             let rec edge = {i, j, weight, allowable: NotAllowed}
             and j = {
-              content: jId,
+              content: jContent,
               parent: None,
               dualVar: 0.,
               bestEdge: None,
@@ -695,14 +712,14 @@ module Graph = {
               ~edges=[edge, ...edges],
               ~edgeSet,
               ~vertices=[j, ...vertices],
-              ~vertexMap=Belt.Map.set(vertexMap, jId, j),
+              ~vertexMap=Belt.Map.Dict.set(vertexMap, jContent, j, ~cmp),
               ~vertexSize=succ(vertexSize),
               ~maxWeight,
             );
           | (None, Some(j)) =>
             let rec edge = {i, j, weight, allowable: NotAllowed}
             and i = {
-              content: iId,
+              content: iContent,
               parent: None,
               dualVar: 0.,
               bestEdge: None,
@@ -718,14 +735,14 @@ module Graph = {
               ~edges=[edge, ...edges],
               ~edgeSet,
               ~vertices=[i, ...vertices],
-              ~vertexMap=Belt.Map.set(vertexMap, iId, i),
+              ~vertexMap=Belt.Map.Dict.set(vertexMap, iContent, i, ~cmp),
               ~vertexSize=succ(vertexSize),
               ~maxWeight,
             );
           | (None, None) =>
             let rec edge = {i, j, weight, allowable: NotAllowed}
             and i = {
-              content: iId,
+              content: iContent,
               parent: None,
               dualVar: 0.,
               bestEdge: None,
@@ -736,7 +753,7 @@ module Graph = {
               },
             }
             and j = {
-              content: jId,
+              content: jContent,
               parent: None,
               dualVar: 0.,
               bestEdge: None,
@@ -752,19 +769,21 @@ module Graph = {
               ~edgeSet,
               ~vertices=[i, j, ...vertices],
               ~vertexMap=
-                vertexMap->Belt.Map.set(iId, i)->Belt.Map.set(jId, j),
+                vertexMap
+                ->Belt.Map.Dict.set(iContent, i, ~cmp)
+                ->Belt.Map.Dict.set(jContent, j, ~cmp),
               ~vertexSize=vertexSize |> succ |> succ,
               ~maxWeight,
             );
           };
-        };
+        }
       };
     loop(
       ~rawEdges,
       ~vertices=[],
       ~edges=[],
-      ~edgeSet,
-      ~vertexMap,
+      ~edgeSet=Belt.Set.Dict.empty,
+      ~vertexMap=Belt.Map.Dict.empty,
       ~vertexSize=0,
       ~maxWeight=0.,
     );
@@ -773,30 +792,39 @@ module Graph = {
   let make = makeGraph;
 
   let updateDualVarsByDelta = (graph, ~delta) => {
-    Belt.List.forEachU(graph.vertices, (. v) =>
-      v.dualVar = {
-        switch (Node.label(v.fields.inBlossom)) {
-        /* S-vertex: u = u - delta */
-        | SingleS
-        | S(_) => v.dualVar -. delta
-        /* T-vertex: u = u + delta */
-        | T(_) => v.dualVar +. delta
-        | Free => v.dualVar
+    let rec updateVertices =
+      fun
+      | [] => ()
+      | [v, ...rest] => {
+          v.dualVar = {
+            switch (Node.label(v.fields.inBlossom)) {
+            /* S-vertex: u = u - delta */
+            | SingleS
+            | S(_) => v.dualVar -. delta
+            /* T-vertex: u = u + delta */
+            | T(_) => v.dualVar +. delta
+            | Free => v.dualVar
+            };
+          };
+          updateVertices(rest);
         };
-      }
-    );
-    Belt.List.forEachU(graph.blossoms, (. b) => {
-      b.dualVar = {
-        switch (b) {
-        /* top-level S-blossom: z = z + delta */
-        | {parent: None, label: SingleS | S(_), _} => b.dualVar +. delta
-        /* top-level T-blossom: z = z - delta */
-        | {parent: None, label: T(_), _} => b.dualVar -. delta
-        | {parent: Some(_), _}
-        | {label: Free, _} => b.dualVar
+    let rec updateBlossoms =
+      fun
+      | [] => updateVertices(graph.vertices)
+      | [b, ...rest] => {
+          b.dualVar = {
+            switch (b) {
+            /* top-level S-blossom: z = z + delta */
+            | {parent: None, label: SingleS | S(_), _} => b.dualVar +. delta
+            /* top-level T-blossom: z = z - delta */
+            | {parent: None, label: T(_), _} => b.dualVar -. delta
+            | {parent: Some(_), _}
+            | {label: Free, _} => b.dualVar
+            };
+          };
+          updateBlossoms(rest);
         };
-      }
-    });
+    updateBlossoms(graph.blossoms);
   };
 };
 
@@ -876,8 +904,8 @@ module AddBlossom = {
     open ParityList;
     open Node.Infix;
     let children = Odd.concatEven(front, Even.reverse(back));
-    switch (Odd.trimToU(children, ~f=(. {node, _}) => node =|= lastV)) {
-    | None => Odd.trimFromU(children, ~f=(. {node, _}) => node =|= nextW)
+    switch (Odd.trimTo(children, ~f=(. {node, _}) => node =|= lastV)) {
+    | None => Odd.trimFrom(children, ~f=(. {node, _}) => node =|= nextW)
     | children => children
     };
   };
@@ -933,74 +961,96 @@ module AddBlossom = {
 
   /* Now we can create a blossom. */
 
-  let bestEdgesReducerHelper = (~b, ~neighbor as w, ~bestEdgeList, ~edge) =>
-    switch (Node.eqB(w, b), Node.label(w)) {
-    | (false, SingleS | S(_)) =>
-      switch (Belt.List.getAssoc(bestEdgeList, w, Node.eq)) {
-      | Some(neighbor) when Edge.slack(edge) < Edge.slack(neighbor) =>
-        Belt.List.setAssoc(bestEdgeList, w, edge, Node.eq)
-      | None => Belt.List.setAssoc(bestEdgeList, w, edge, Node.eq)
-      | _ => bestEdgeList
-      }
-    | (true, SingleS | S(_))
-    | (true | false, Free | T(_)) => bestEdgeList
+  /**
+   * If the node has an edge set but with a higher slack, then update the node
+   * with the new edge. If the node has not been set yet, then add it with the
+   * new edge.
+   */
+  let setBestEdgeMap = (bestEdgeMap, ~w, ~edge) => {
+    /* This does not preserve the order, which should not matter. */
+    let rec loop = (acc, bestEdgeMap, hasBeenSet) =>
+      switch (bestEdgeMap) {
+      | [] => hasBeenSet ? acc : [{w, edge}, ...acc]
+      | [bestEdge, ...bestEdgeMap] =>
+        let {w: w', edge: edge'} = bestEdge;
+        if (Node.eq(w, w') && Edge.(slack(edge) < slack(edge'))) {
+          loop([{w, edge}, ...acc], bestEdgeMap, true);
+        } else {
+          loop([bestEdge, ...acc], bestEdgeMap, hasBeenSet);
+        };
+      };
+    loop([], bestEdgeMap, false);
+  };
+
+  let bestEdgesReducerHelper = (~b, ~neighbor as w, ~bestEdgeMap, ~edge) =>
+    switch (Node.label(w)) {
+    | SingleS
+    | S(_) when !Node.eqB(w, b) => setBestEdgeMap(bestEdgeMap, ~w, ~edge)
+    | SingleS
+    | S(_)
+    | Free
+    | T(_) => bestEdgeMap
     };
 
-  let endpointReducer = b =>
-    (. bestEdgeList, endpoint) =>
-      bestEdgesReducerHelper(
-        ~b,
-        ~neighbor=Endpoint.toVertex(endpoint).fields.inBlossom,
-        ~bestEdgeList,
-        ~edge=Endpoint.toEdge(endpoint),
-      );
+  let rec endpointReducer = (~neighbors, ~bestEdgeMap, ~b) =>
+    switch (neighbors) {
+    | [] => bestEdgeMap
+    | [endpoint, ...neighbors] =>
+      let bestEdgeMap =
+        bestEdgesReducerHelper(
+          ~b,
+          ~neighbor=Endpoint.toVertex(endpoint).fields.inBlossom,
+          ~bestEdgeMap,
+          ~edge=Endpoint.toEdge(endpoint),
+        );
+      endpointReducer(~bestEdgeMap, ~neighbors, ~b);
+    };
 
-  let bestEdgesReducer = b =>
-    (. bestEdgeList, (_node, edge)) =>
-      bestEdgesReducerHelper(
-        ~b,
-        ~neighbor=
-          Node.eqB(edge.j.fields.inBlossom, b)
-            ? edge.i.fields.inBlossom : edge.j.fields.inBlossom,
-        ~bestEdgeList,
-        ~edge,
-      );
+  let rec bestEdgesReducer = (~b, ~blossomBestEdges, ~bestEdgeMap) =>
+    switch (blossomBestEdges) {
+    | [] => bestEdgeMap
+    | [{edge, _}, ...blossomBestEdges] =>
+      let bestEdgeMap =
+        bestEdgesReducerHelper(
+          ~b,
+          ~neighbor=
+            Node.eqB(edge.j.fields.inBlossom, b)
+              ? edge.i.fields.inBlossom : edge.j.fields.inBlossom,
+          ~bestEdgeMap,
+          ~edge,
+        );
+      bestEdgesReducer(~bestEdgeMap, ~blossomBestEdges, ~b);
+    };
 
   let computeBestEdges = b =>
-    ParityList.Odd.reduceU(
+    ParityList.Odd.reduce(
       b.fields.children,
       ~init=[],
-      ~f=(. bestEdgeList, child) => {
-        let bestEdgeList =
-          switch (child.node) {
+      ~f=(. bestEdgeMap, {node, _}) => {
+        let bestEdgeMap =
+          switch (node) {
           /* This sub-blossom does not have a list of least-slack edges; get
              the information from the vertices. */
           | Blossom({fields: {blossomBestEdges: [], _}, _}) as node
           | Vertex(_) as node =>
-            Node.Leaves.reduceU(
-              node, ~init=bestEdgeList, ~f=(. bestEdgeList, v) =>
-              Belt.List.reduceU(
-                v.fields.neighbors,
-                bestEdgeList,
-                endpointReducer(b),
-              )
+            Node.Leaves.reduce(
+              node,
+              ~init=bestEdgeMap,
+              ~f=(. bestEdgeMap, {fields: {neighbors, _}, _}) =>
+              endpointReducer(~neighbors, ~bestEdgeMap, ~b)
             )
           /* Walk this sub-blossom's least-slack edges. */
           | Blossom({fields: {blossomBestEdges, _}, _}) =>
-            Belt.List.reduceU(
-              blossomBestEdges,
-              bestEdgeList,
-              bestEdgesReducer(b),
-            )
+            bestEdgesReducer(~b, ~bestEdgeMap, ~blossomBestEdges)
           };
         /* Forget about least-slack edges of this sub-blossom. */
-        switch (child.node) {
+        switch (node) {
         | Vertex(v) => v.bestEdge = None
         | Blossom(b) =>
           b.bestEdge = None;
           b.fields.blossomBestEdges = [];
         };
-        bestEdgeList;
+        bestEdgeMap;
       },
     );
 
@@ -1010,11 +1060,8 @@ module AddBlossom = {
    * T-vertices to S and add them to the queue.
    */
   let makeBlossom = (graph, children, queue) => {
-    let content =
-      switch (graph.blossoms) {
-      | [] => 0
-      | [{content, _}, ..._] => succ(content)
-      };
+    let content = graph.nextBlossom;
+    graph.nextBlossom = succ(content);
     let ParityList.Odd({node: baseNode, _}, _) = children;
     let b = {
       content,
@@ -1027,12 +1074,15 @@ module AddBlossom = {
         blossomBestEdges: [],
       },
     };
-    ParityList.Odd.forEachU(children, ~f=(. c) =>
-      Node.setParent(c.node, ~b)
+    ParityList.Odd.forEach(children, ~f=(. {node, _}) =>
+      switch (node) {
+      | Vertex(v) => v.parent = Some(b)
+      | Blossom(b') => b'.parent = Some(b)
+      }
     );
     /* Relabel the vertices. */
     let queue =
-      Node.Leaves.reduceU(
+      Node.Leaves.reduce(
         Blossom(b),
         ~init=queue,
         ~f=(. queue, v) => {
@@ -1050,24 +1100,24 @@ module AddBlossom = {
       );
     graph.blossoms = [b, ...graph.blossoms];
     /* Compute the blossom's best edges. */
-    let bestEdges = computeBestEdges(b);
-    let bestEdge =
-      Belt.List.reduceU(bestEdges, b.bestEdge, (. bestEdge, (_node, edge)) =>
-        switch (bestEdge) {
-        | None => Some(edge)
-        | Some(newBestEdge) when Edge.(slack(edge) < slack(newBestEdge)) =>
-          Some(edge)
-        | _ => bestEdge
-        }
-      );
-    b.bestEdge = {
-      switch (bestEdge) {
-      | Some(edge) => Some(edge)
-      | None => None
-      };
-    };
-    b.fields.blossomBestEdges = bestEdges;
-    queue;
+    b.fields.blossomBestEdges = computeBestEdges(b);
+
+    let rec getBestEdge =
+      fun
+      | [] => queue
+      | [{edge, _}, ...rest] => {
+          b.bestEdge = {
+            switch (b.bestEdge) {
+            | None => Some(edge)
+            | Some(newBestEdge) when Edge.(slack(edge) < slack(newBestEdge)) =>
+              Some(edge)
+            | _ => b.bestEdge
+            };
+          };
+          getBestEdge(rest);
+        };
+
+    getBestEdge(b.fields.blossomBestEdges);
   };
   /* Aliasing `make` and `makeBlossom` for better JavaScript debugging. */
   let make = makeBlossom;
@@ -1140,7 +1190,7 @@ module ModifyBlossom = {
    * between vertex `v` and the base vertex. Keep blossom bookkeeping
    * consistent.
    */
-  let rec augment = (b, v, mates) => {
+  let rec augment = (b, v, mates, ~cmp) => {
     [%log.debug
       "augmentBlossom";
       ("Blossom", Blossom._debug(b));
@@ -1154,7 +1204,7 @@ module ModifyBlossom = {
     /* Recursively deal with the first sub-blossom. */
     let mates =
       switch (t) {
-      | Blossom(b) => augment(b, v, mates)
+      | Blossom(b) => augment(b, v, mates, ~cmp)
       | Vertex(_) => mates
       };
     /* Figure out how we'll go 'round the blossom. */
@@ -1185,16 +1235,17 @@ module ModifyBlossom = {
           };
         let mates =
           switch (child.node) {
-          | Blossom(b) => augment(b, Endpoint.toVertex(p), mates)
+          | Blossom(b) => augment(b, Endpoint.toVertex(p), mates, ~cmp)
           | Vertex(_) => mates
           };
         let mates =
           switch (child'.node) {
-          | Blossom(b) => augment(b, Endpoint.toReverseVertex(p), mates)
+          | Blossom(b) =>
+            augment(b, Endpoint.toReverseVertex(p), mates, ~cmp)
           | Vertex(_) => mates
           };
         /* Match the edge connecting those sub-blossoms. */
-        let mates = Mates.Internal.setEdge(mates, Endpoint.toEdge(p));
+        let mates = Mates.setEdge(mates, Endpoint.toEdge(p), ~cmp);
         [%log.debug
           "PAIR";
           ("v", p |> Endpoint.toVertex |> Vertex._debug);
@@ -1206,7 +1257,7 @@ module ModifyBlossom = {
   };
 
   let rec relabelToBase =
-          (childsToBase, nextEndpoint, queue, mates, direction) =>
+          (childsToBase, nextEndpoint, queue, mates, direction, ~cmp) =>
     switch (childsToBase) {
     | Odd(_, Empty) => (nextEndpoint, queue)
     | Odd({endpoint, _}, Even({endpoint: endpoint', _}, rest)) =>
@@ -1218,6 +1269,7 @@ module ModifyBlossom = {
           ~p=nextEndpoint,
           ~mates,
           ~queue,
+          ~cmp,
         );
       let nextEndpoint =
         switch (direction) {
@@ -1227,7 +1279,7 @@ module ModifyBlossom = {
           Endpoint.reverse(endpoint);
         };
       Endpoint.toEdge(nextEndpoint).allowable = Allowed;
-      relabelToBase(rest, nextEndpoint, queue, mates, direction);
+      relabelToBase(rest, nextEndpoint, queue, mates, direction, ~cmp);
     };
 
   /**
@@ -1248,7 +1300,7 @@ module ModifyBlossom = {
     open ParityList.Infix;
     /* Convert sub-blossoms into top-level blossoms. */
     let queue =
-      Odd.reduceU(b.fields.children, ~init=queue, ~f=(. queue, child) =>
+      Odd.reduce(b.fields.children, ~init=queue, ~f=(. queue, child) =>
         switch (child.node) {
         | Vertex(v) as vertex =>
           v.fields.inBlossom = vertex;
@@ -1263,7 +1315,7 @@ module ModifyBlossom = {
           | (_, Endstage | NotEndstage) =>
             /* This sub-blossom is becoming a top-level blossom, so change its
                children's inBlossom to it. */
-            Node.Leaves.forEachU(blossom, ~f=(. v) =>
+            Node.Leaves.reduce(blossom, ~init=(), ~f=(. _, v) =>
               v.fields.inBlossom = blossom
             );
             queue;
@@ -1294,6 +1346,7 @@ module ModifyBlossom = {
                 queue,
                 mates,
                 Forward,
+                ~cmp=graph.cmp,
               );
             (base.node, endpoint, front, queue);
           | GoBackward({base, front, entry, back}) =>
@@ -1304,16 +1357,20 @@ module ModifyBlossom = {
                 queue,
                 mates,
                 Backward,
+                ~cmp=graph.cmp,
               );
             (base.node, endpoint, back, queue);
           };
         /* Relabel the base T-sub-blossom WITHOUT stepping through to its mate.
          */
-        Node.removeBestEdge(base);
+        switch (base) {
+        | Blossom(b) => b.bestEdge = None
+        | Vertex(v) => v.bestEdge = None
+        };
         Label.assignTSingle(~w=base, ~p);
         Label.assignTSingleVertex(~v=Endpoint.toReverseVertex(p), ~p);
         /* Continue along the blossom until we get to the entry child. */
-        Even.reduceU(childrenToEntryChild, ~init=queue, ~f=(. queue, child) => {
+        Even.reduce(childrenToEntryChild, ~init=queue, ~f=(. queue, child) => {
           /* Examine the vertices of the sub-blossom to see whether it is
              reachable from a neighboring S-vertex outside the expanding
              blossom. */
@@ -1332,12 +1389,13 @@ module ModifyBlossom = {
               | [v, ...rest] =>
                 switch (v.label) {
                 | Free => labelReachableVertex(rest)
-                | T(p) => Label.assignT(~v, ~p, ~mates, ~queue)
+                | T(p) =>
+                  Label.assignT(~v, ~p, ~mates, ~queue, ~cmp=graph.cmp)
                 | SingleS
                 | S(_) => failwith("Must be labeled Free or T.")
                 }
               };
-            child.node |> Node.Leaves.toList |> labelReachableVertex;
+            Node.Leaves.toList(child.node, ~init=[]) |> labelReachableVertex;
           }
         });
 
@@ -1345,9 +1403,21 @@ module ModifyBlossom = {
       | (T(_), Endstage)
       | (Free | SingleS | S(_), Endstage | NotEndstage) => queue
       };
-    graph.blossoms =
-      Belt.List.keepU(graph.blossoms, (. x) => !Blossom.eq(b, x));
-    queue;
+
+    /* This reverses the list, but that shouldn't matter. */
+    let rec removeBlossom = (newL, l) =>
+      switch (l) {
+      | [] =>
+        graph.blossoms = newL;
+        queue;
+      | [b', ...rest] =>
+        if (Blossom.eq(b, b')) {
+          removeBlossom(newL, rest);
+        } else {
+          removeBlossom([b', ...newL], rest);
+        }
+      };
+    removeBlossom([], graph.blossoms);
   };
 };
 
@@ -1358,75 +1428,76 @@ module ModifyBlossom = {
 module Delta = {
   type t('v) =
     | One(float)
-    | Two({
-        delta: float,
-        edge: Edge.t('v),
-      })
-    | Three({
-        delta: float,
-        edge: Edge.t('v),
-      })
-    | Four({
-        delta: float,
-        blossom: Blossom.t('v),
-      });
+    | Two(float, Edge.t('v))
+    | Three(float, Edge.t('v))
+    | Four(float, Blossom.t('v));
 
   let _debug =
     fun
     | One(delta) => {j|1=$delta|j}
-    | Two({delta, _}) => {j|2=$delta|j}
-    | Three({delta, _}) => {j|3=$delta|j}
-    | Four({delta, _}) => {j|4=$delta|j};
+    | Two(delta, _) => {j|2=$delta|j}
+    | Three(delta, _) => {j|3=$delta|j}
+    | Four(delta, _) => {j|4=$delta|j};
 
-  let getMinDualVar = ({vertices, maxWeight, _}) =>
-    Belt.List.reduceU(vertices, maxWeight, (. minDualVar, v) =>
-      min(minDualVar, v.dualVar)
-    );
+  let getMinDualVar = ({vertices, maxWeight, _}) => {
+    let rec loop = (minDualVar, vertices) =>
+      switch (vertices) {
+      | [] => minDualVar
+      | [{dualVar, _}, ...rest] => loop(min(minDualVar, dualVar), rest)
+      };
+    loop(maxWeight, vertices);
+  };
 
-  /**
-   * Compute delta1: the minimum value of any vertex dual variable.
-   */
-  let one = (~cardinality, ~graph) =>
-    switch (cardinality) {
-    | `Max => None
-    | `NotMax => Some(One(getMinDualVar(graph)))
+  let finalize = (deltaType, ~graph) =>
+    switch (deltaType) {
+    | Some(deltaType) => deltaType
+    | None =>
+      /* No further improvement possible; max-cardinality optimum reached.
+         Do a final delta update to make the optimum verifiable. */
+      /* (Note that we aren't currently verifying the optimum.) */
+      let delta = getMinDualVar(graph);
+      One(max(delta, 0.));
     };
 
   /**
-   * Compute delta2: the minimum slack on any edge between an S-vertex and a
-   * free vertex.
+   * Compute delta4: minimum z variable of any T-blossom.
    */
-  let two = (deltaType, ~graph) =>
-    Belt.List.reduceU(graph.vertices, deltaType, (. deltaType, v) =>
-      switch (v.bestEdge, Node.label(v.fields.inBlossom)) {
-      | (Some(edge), Free) =>
-        let kslack = Edge.slack(edge);
-        switch (deltaType) {
-        | None => Some(Two({delta: kslack, edge}))
-        | Some(
-            One(delta) | Two({delta, _}) | Three({delta, _}) |
-            Four({delta, _}),
-          )
-            when kslack < delta =>
-          Some(Two({delta: kslack, edge}))
-        | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
-        };
-      | (_, Free | SingleS | S(_) | T(_)) => deltaType
-      }
-    );
+  let four = (deltaType, ~graph) => {
+    let rec loop = (deltaType, l) =>
+      switch (l) {
+      | [] => finalize(deltaType, ~graph)
+      | [b, ...rest] =>
+        let deltaType =
+          switch (b) {
+          | {parent: None, label: T(_), dualVar, _} =>
+            switch (deltaType) {
+            | None => Some(Four(dualVar, b))
+            | Some(
+                One(delta) | Two(delta, _) | Three(delta, _) |
+                Four(delta, _),
+              )
+                when dualVar < delta =>
+              Some(Four(dualVar, b))
+            | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
+            }
+          | {label: Free | SingleS | S(_) | T(_), _} => deltaType
+          };
+        loop(deltaType, rest);
+      };
+    loop(deltaType, graph.blossoms);
+  };
 
   let threeHelper = (deltaType, node) =>
     switch (node) {
     | {parent: None, bestEdge: Some(edge), label: SingleS | S(_), _} =>
       let kslack = Edge.slack(edge) /. 2.;
       switch (deltaType) {
-      | None => Some(Three({delta: kslack, edge}))
+      | None => Some(Three(kslack, edge))
       | Some(
-          One(delta) | Two({delta, _}) | Three({delta, _}) |
-          Four({delta, _}),
+          One(delta) | Two(delta, _) | Three(delta, _) | Four(delta, _),
         )
           when kslack < delta =>
-        Some(Three({delta: kslack, edge}))
+        Some(Three(kslack, edge))
       | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
       };
     | {label: Free | SingleS | S(_) | T(_), _} => deltaType
@@ -1437,72 +1508,88 @@ module Delta = {
    * S-blossoms.
    */
   let three = (deltaType, ~graph) => {
-    let deltaType = Belt.List.reduce(graph.vertices, deltaType, threeHelper);
-    Belt.List.reduce(graph.blossoms, deltaType, threeHelper);
+    let rec blossoms = (deltaType, l) =>
+      switch (l) {
+      | [] => four(deltaType, ~graph)
+      | [b, ...rest] => blossoms(threeHelper(deltaType, b), rest)
+      };
+    let rec vertices = (deltaType, l) =>
+      switch (l) {
+      | [] => blossoms(deltaType, graph.blossoms)
+      | [v, ...rest] => vertices(threeHelper(deltaType, v), rest)
+      };
+    vertices(deltaType, graph.vertices);
   };
 
   /**
-   * Compute delta4: minimum z variable of any T-blossom.
+   * Compute delta2: the minimum slack on any edge between an S-vertex and a
+   * free vertex.
    */
-  let four = (deltaType, ~graph) =>
-    Belt.List.reduceU(graph.blossoms, deltaType, (. deltaType, b) =>
-      switch (b) {
-      | {parent: None, label: T(_), dualVar, _} =>
-        switch (deltaType) {
-        | None => Some(Four({delta: dualVar, blossom: b}))
-        | Some(
-            One(delta) | Two({delta, _}) | Three({delta, _}) |
-            Four({delta, _}),
-          )
-            when dualVar < delta =>
-          Some(Four({delta: dualVar, blossom: b}))
-        | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
-        }
-      | {label: Free | SingleS | S(_) | T(_), _} => deltaType
-      }
-    );
+  let two = (deltaType, ~graph) => {
+    let rec loop = (deltaType, l) =>
+      switch (l) {
+      | [] => three(deltaType, ~graph)
+      | [v, ...rest] =>
+        let deltaType =
+          switch (v.bestEdge, Node.label(v.fields.inBlossom)) {
+          | (Some(edge), Free) =>
+            let kslack = Edge.slack(edge);
+            switch (deltaType) {
+            | None => Some(Two(kslack, edge))
+            | Some(
+                One(delta) | Two(delta, _) | Three(delta, _) |
+                Four(delta, _),
+              )
+                when kslack < delta =>
+              Some(Two(kslack, edge))
+            | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
+            };
+          | (_, Free | SingleS | S(_) | T(_)) => deltaType
+          };
+        loop(deltaType, rest);
+      };
+    loop(deltaType, graph.vertices);
+  };
 
-  let makeDelta = (~cardinality, ~graph) =>
-    one(~cardinality, ~graph)
-    |> two(~graph)
-    |> three(~graph)
-    |> four(~graph)
-    |> {
-      fun
-      | Some(deltaType) => deltaType
-      /* No further improvement possible; max-cardinality optimum reached.
-         Do a final delta update to make the optimum verifiable. */
-      | None => One(graph |> getMinDualVar |> max(0.));
-    };
-  /* Aliasing `make` and `makeDelta` for better JavaScript debugging. */
-  let make = makeDelta;
+  /**
+   * Compute delta1: the minimum value of any vertex dual variable.
+   */
+  let one = (~cardinality, ~graph) => {
+    let deltaType =
+      switch (cardinality) {
+      | `Max => None
+      | `NotMax => Some(One(getMinDualVar(graph)))
+      };
+    two(deltaType, ~graph);
+  };
+
+  let make = one;
 };
 
 module Substage = {
-  /* Each iteration of the loop is a "substage." A substage tries to find an
-     augmenting path. If found, the path is used to improve the matching and the
-     stage ends. If there is no augmenting path, the primal-dual method is used
-     to pump some slack out of the dual variables. */
+  /**
+   * Each iteration of the loop is a "substage." A substage tries to find an
+   * augmenting path. If found, the path is used to improve the matching and the
+   * stage ends. If there is no augmenting path, the primal-dual method is used
+   * to pump some slack out of the dual variables.
+   */
   type t('v, 'id) =
     | Augmented(Mates.t('v, 'id))
-    | NotAugmented({
-        queue: list(Vertex.t('v)),
-        mates: Mates.t('v, 'id),
-      });
+    | NotAugmented(list(Vertex.t('v)), Mates.t('v, 'id));
 
   /**
    * Match vertex `s` to remote endpoint `p`. Then trace back from `s` until we
    * find a single vertex, swapping matched and unmatched edges as we go.
    */
-  let rec augmentMatchingLoop = (mates, ~s, ~p) => {
+  let rec augmentMatchingLoop = (mates, ~s, ~p, ~cmp) => {
     let mates =
       switch (s.fields.inBlossom) {
       /* Augment through the S-blossom to the base. */
-      | Blossom(b) => ModifyBlossom.augment(b, s, mates)
+      | Blossom(b) => ModifyBlossom.augment(b, s, mates, ~cmp)
       | Vertex(_) => mates
       };
     /* Update `s`'s mate. */
-    let mates = Mates.Internal.set(mates, s, p);
+    let mates = Mates.set(mates, s, p, ~cmp);
     /* Trace one step back. */
     switch (Node.label(s.fields.inBlossom)) {
     | Free
@@ -1520,14 +1607,14 @@ module Substage = {
         let mates =
           switch (tInBlossom) {
           /* Augment through the T-blossom from `j` to base. */
-          | Blossom(bt) => ModifyBlossom.augment(bt, j, mates)
+          | Blossom(bt) => ModifyBlossom.augment(bt, j, mates, ~cmp)
           | Vertex(_) => mates
           };
         /* Update `j`'s mate. */
-        let mates = Mates.Internal.set(mates, j, p);
+        let mates = Mates.set(mates, j, p, ~cmp);
         /* Keep the opposite endpoint. It will be assigned to `s`'s mate in the
            next step. */
-        augmentMatchingLoop(mates, ~s, ~p=Endpoint.reverse(p));
+        augmentMatchingLoop(mates, ~s, ~p=Endpoint.reverse(p), ~cmp);
       };
     /* Reached a single vertex; stop. */
     | SingleS => mates
@@ -1539,7 +1626,7 @@ module Substage = {
    * vertices. The augmenting path runs through the edge which connects a pair
    * of S vertices.
    */
-  let augmentMatching = (edge, mates) => {
+  let augmentMatching = (edge, mates, ~cmp) => {
     [%log.debug
       "augmentMatching";
       ("v", Vertex._debug(edge.i));
@@ -1550,14 +1637,15 @@ module Substage = {
       ("PAIR", (Vertex._debug(edge.i), Vertex._debug(edge.j)))
     ];
     mates
-    ->augmentMatchingLoop(~s=edge.i, ~p=J(edge))
-    ->augmentMatchingLoop(~s=edge.j, ~p=I(edge));
+    ->augmentMatchingLoop(~s=edge.i, ~p=J(edge), ~cmp)
+    ->augmentMatchingLoop(~s=edge.j, ~p=I(edge), ~cmp)
+    ->Augmented;
   };
 
   let scanNeighbors = (vertex, graph, mates, queue) => {
     let rec loop = (neighbors, queue) =>
       switch (neighbors) {
-      | [] => NotAugmented({mates, queue})
+      | [] => NotAugmented(queue, mates)
       | [endpoint, ...neighbors] =>
         let edge = Endpoint.toEdge(endpoint);
         let neighbor = Endpoint.toVertex(endpoint);
@@ -1584,6 +1672,7 @@ module Substage = {
                   ~p=Endpoint.reverse(endpoint),
                   ~mates,
                   ~queue,
+                  ~cmp=graph.cmp,
                 );
               loop(neighbors, queue);
             /* (C2) neighbor is an S-vertex (not in the same blossom; follow
@@ -1611,7 +1700,7 @@ module Substage = {
               /* Found an augmenting path; augment the matching and end this
                  stage. */
               | AddBlossom.AugmentingPath =>
-                Augmented(augmentMatching(edge, mates))
+                augmentMatching(edge, mates, ~cmp=graph.cmp)
               }
             | T(_) =>
               switch (neighbor.label) {
@@ -1635,11 +1724,17 @@ module Substage = {
             | S(_) =>
               /* Keep track of the least-slack non-allowable edge to a different
                  S-blossom. */
-              switch (Node.bestEdge(vertex.fields.inBlossom)) {
-              | None => Node.setBestEdge(vertex.fields.inBlossom, ~edge)
-              | Some(bestEdge) when kslack < Edge.slack(bestEdge) =>
-                Node.setBestEdge(vertex.fields.inBlossom, ~edge)
-              | _ => ()
+              switch (vertex.fields.inBlossom) {
+              | Blossom({bestEdge: None, _} as b) => b.bestEdge = Some(edge)
+              | Vertex({bestEdge: None, _} as v) => v.bestEdge = Some(edge)
+              | Blossom({bestEdge: Some(bestEdge), _} as b)
+                  when kslack < Edge.slack(bestEdge) =>
+                b.bestEdge = Some(edge)
+              | Vertex({bestEdge: Some(bestEdge), _} as v)
+                  when kslack < Edge.slack(bestEdge) =>
+                v.bestEdge = Some(edge)
+              | Blossom(_)
+              | Vertex(_) => ()
               };
               loop(neighbors, queue);
             | Free
@@ -1673,11 +1768,11 @@ module Substage = {
    */
   let rec labelingLoop = (graph, mates, queue) =>
     switch (queue) {
-    | [] => NotAugmented({queue, mates})
+    | [] => NotAugmented(queue, mates)
     | [vertex, ...queue] =>
       [%log.debug "POP"; ("Vertex", Vertex._debug(vertex))];
       switch (scanNeighbors(vertex, graph, mates, queue)) {
-      | NotAugmented({queue, mates}) => labelingLoop(graph, mates, queue)
+      | NotAugmented(queue, mates) => labelingLoop(graph, mates, queue)
       | Augmented(_) as augmented => augmented
       };
     };
@@ -1686,7 +1781,7 @@ module Substage = {
     %log.debug
     "SUBSTAGE";
     switch (labelingLoop(graph, mates, queue)) {
-    | NotAugmented({queue, mates}) =>
+    | NotAugmented(queue, mates) =>
       /* There is no augmenting path under these constraints;
          compute delta and reduce slack in the optimization problem. */
       let delta = Delta.make(~cardinality, ~graph);
@@ -1696,9 +1791,9 @@ module Substage = {
       /* No further improvement possible; optimum reached. */
       | Delta.One(delta) =>
         Graph.updateDualVarsByDelta(graph, ~delta);
-        NotAugmented({queue, mates});
+        NotAugmented(queue, mates);
       /* Use the least-slack edge to continue the search. */
-      | Delta.Two({delta, edge}) =>
+      | Delta.Two(delta, edge) =>
         Graph.updateDualVarsByDelta(graph, ~delta);
         let nextVertex =
           switch (Node.label(edge.i.fields.inBlossom)) {
@@ -1711,13 +1806,13 @@ module Substage = {
         edge.allowable = Allowed;
         substage(graph, queue, mates, cardinality);
       /* Use the least-slack edge to continue the search. */
-      | Delta.Three({delta, edge}) =>
+      | Delta.Three(delta, edge) =>
         Graph.updateDualVarsByDelta(graph, ~delta);
         let queue = [edge.i, ...queue];
         edge.allowable = Allowed;
         substage(graph, queue, mates, cardinality);
       /* Expand the least-z blossom. */
-      | Delta.Four({delta, blossom}) =>
+      | Delta.Four(delta, blossom) =>
         Graph.updateDualVarsByDelta(graph, ~delta);
         let queue =
           ModifyBlossom.expand(
@@ -1737,118 +1832,215 @@ module Substage = {
 };
 
 /**
- * Loop until no further improvement is possible.
+ * Remove labels, forget least-slack edges and allowable edges, and empty queue.
  */
-let rec mainLoop = (~graph, ~mates, ~cardinality, ~stageNum, ~stageMax) =>
-  if (stageNum == stageMax) {
-    mates;
-  } else {
-    [%log.debug {j|STAGE $stageNum|j}; ("Mates", Mates._debug(mates))];
-    /* Each iteration of this loop is a "stage". A stage finds an augmenting
-       path and uses that to improve the matching. */
-
-    /* Remove labels, forget least-slack edges and allowable edges, and empty
-       queue. */
-    Belt.List.forEachU(
-      graph.blossoms,
-      (. b) => {
+let resetStage = (~graph, ~mates) => {
+  /* Label all single blossoms/vertices with S and put them in the queue. */
+  let rec resetVerticesAndQueue = (queue, vertices) =>
+    switch (vertices) {
+    | [] => queue
+    | [v, ...rest] =>
+      /* Forget all about least-slack edges. */
+      v.bestEdge = None;
+      if (Mates.has(mates, v, ~cmp=graph.cmp)) {
+        v.label = Free;
+        resetVerticesAndQueue(queue, rest);
+      } else {
+        let queue = Label.assignS(~v, ~label=SingleS, ~queue);
+        resetVerticesAndQueue(queue, rest);
+      };
+    };
+  let rec resetBlossoms =
+    fun
+    | [] => resetVerticesAndQueue([], graph.vertices)
+    | [b, ...rest] => {
         b.bestEdge = None;
         b.fields.blossomBestEdges = [];
         b.label = Free;
-      },
-    );
-    /* Loss of labeling means that we can not be sure that currently
-       allowable edges remain allowable throughout this stage. */
-    Belt.List.forEachU(graph.edges, (. k) => k.allowable = NotAllowed);
-    /* Label all single blossoms/vertices with S and put them in the queue. */
-    let queue =
-      Belt.List.reduceU(
-        graph.vertices,
-        [],
-        (. queue, v) => {
-          /* Forget all about least-slack edges. */
-          v.bestEdge = None;
-          if (Mates.Internal.has(mates, v)) {
-            v.label = Free;
-            queue;
-          } else {
-            Label.assignS(~v, ~label=SingleS, ~queue);
-          };
-        },
-      );
+        resetBlossoms(rest);
+      };
+  /* Loss of labeling means that we can not be sure that currently allowable
+     edges remain allowable throughout this stage. */
+  let rec resetEdges =
+    fun
+    | [] => resetBlossoms(graph.blossoms)
+    | [k, ...rest] => {
+        k.allowable = NotAllowed;
+        resetEdges(rest);
+      };
+  resetEdges(graph.edges);
+};
 
-    switch (Substage.make(graph, queue, mates, cardinality)) {
-    /* No further improvement is possible. */
-    | Substage.NotAugmented({mates, _}) => mates
-    /* End of a stage; expand all S-blossoms which have `dualVar` = 0. */
-    | Substage.Augmented(mates) =>
-      Belt.List.forEachU(graph.blossoms, (. b) =>
+let expandAllSBlossoms = (~graph, ~mates, ~queue) => {
+  let rec loop =
+    fun
+    | [] => ()
+    | [b, ...rest] => {
         switch (b) {
         | {parent: None, label: SingleS | S(_), dualVar: 0., _} =>
           ModifyBlossom.expand(~graph, ~b, ~stage=Endstage, ~mates, ~queue)
           |> ignore
         | {label: Free | SingleS | S(_) | T(_), _} => ()
-        }
-      );
-      mainLoop(
-        ~graph,
-        ~mates,
-        ~cardinality,
-        ~stageNum=succ(stageNum),
-        ~stageMax,
-      );
-    };
-  };
+        };
+        loop(rest);
+      };
+  loop(graph.blossoms);
+};
 
 /*******************************************************************************
  * Part VI: The public interface
  ******************************************************************************/
 
-type t('v, 'id) = Mates.t('v, 'id);
+type t('v, 'id) = Belt.Map.t('v, Endpoint.t('v), 'id);
 
-let make = (~cardinality=`NotMax, edges, ~id, ~cmp) =>
-  switch (edges) {
-  /* Deal swiftly with empty graphs. */
-  | [] => Mates.Internal.make(~id)
-  | edges =>
-    let graph = Graph.make(edges, ~id, ~cmp);
-    mainLoop(
-      ~graph,
-      ~mates=Mates.Internal.make(~id),
-      ~cardinality,
-      ~stageNum=0,
-      ~stageMax=graph.vertexSize,
-    );
-  };
-
-let get = Mates.get;
-let reduceU = Mates.reduceU;
-let reduce = Mates.reduce;
-let forEachU = Mates.forEachU;
-let forEach = Mates.forEach;
-let toList = Mates.toList;
-let toMap = Mates.toMap;
-let isEmpty = Mates.isEmpty;
-let has = Mates.has;
-
-/* Not a public functor, just a shortcut for packaging predefined functions
-   namespaced by their own modules. */
-module Make = (M: {
-                 type t;
-                 let cmp: (t, t) => int;
-               }) => {
-  module Cmp = Belt.Id.MakeComparable(M);
-  let make = make(~id=(module Cmp), ~cmp=M.cmp);
+let comparableToBelt =
+    (type v, type id, id: comparable(v, id)): Belt.Id.comparable(v, id) => {
+  module M = (val id);
+  (module M.BeltCmp);
 };
 
-module Int =
-  Make({
-    type t = int;
-    let cmp: (t, t) => int = compare;
+let make = (~cardinality=`NotMax, edges, ~id) => {
+  let graph = Graph.make(edges, ~id);
+  /**
+   * Loop until no further improvement is possible.
+   */
+  let rec loop = (~mates, ~stageNum) =>
+    if (stageNum == graph.vertexSize) {
+      Belt.Map.packIdData(~id=comparableToBelt(id), ~data=Mates.empty);
+    } else {
+      [%log.debug {j|STAGE $stageNum|j}; ("Mates", Mates._debug(mates))];
+      /* Each iteration of this loop is a "stage". A stage finds an augmenting
+         path and uses that to improve the matching. */
+      let queue = resetStage(~graph, ~mates);
+      switch (Substage.make(graph, queue, mates, cardinality)) {
+      | Substage.NotAugmented(_, mates) =>
+        /* No further improvement is possible. */
+        Belt.Map.packIdData(~id=comparableToBelt(id), ~data=mates)
+      | Substage.Augmented(mates) =>
+        /* End of a stage; expand all S-blossoms which have `dualVar` = 0. */
+        expandAllSBlossoms(~graph, ~mates, ~queue);
+        loop(~mates, ~stageNum=succ(stageNum));
+      };
+    };
+  loop(~mates=Mates.empty, ~stageNum=0);
+};
+
+let get = (mates, v) =>
+  switch (Belt.Map.get(mates, v)) {
+  | None => None
+  | Some(p) => Some(Mates.exportEndpoint(p))
+  };
+
+let reduceU = (mates, ~init, ~f) =>
+  Belt.Map.reduceU(mates, init, (. acc, v1, p) =>
+    f(. acc, v1, Mates.exportEndpoint(p))
+  );
+
+let reduce = (mates, ~init, ~f) =>
+  reduceU(mates, ~init, ~f=(. acc, v1, v2) => f(acc, v1, v2));
+
+let forEachU = (mates, ~f) =>
+  Belt.Map.forEachU(mates, (. v1, p) => f(. v1, Mates.exportEndpoint(p)));
+
+let forEach = (mates, ~f) => forEachU(mates, ~f=(. v1, v2) => f(v1, v2));
+
+let toList = mates =>
+  Belt.Map.reduceU(mates, [], (. acc, v, p) =>
+    [(v, Mates.exportEndpoint(p)), ...acc]
+  );
+
+let toMap = mates =>
+  Belt.Map.mapU(mates, (. mate) => Mates.exportEndpoint(mate));
+
+let isEmpty = Belt.Map.isEmpty;
+
+let has = Belt.Map.has;
+
+/* Unsafe functions and functors don't guarantee that the `cmp` values are
+   correct. */
+
+module UnsafeComparableFromBeltU =
+       (
+         M: {
+           module Cmp: Belt.Id.Comparable;
+           let cmp: (. Cmp.t, Cmp.t) => int;
+         },
+       ) => {
+  module BeltCmp = M.Cmp;
+  type t = BeltCmp.t;
+  type identity = BeltCmp.identity;
+  let cmp = M.cmp;
+  module K =
+    Belt.Id.MakeComparableU({
+      type t = RawEdge.t(BeltCmp.t);
+      let cmp = RawEdge.makeCmp(cmp);
+    });
+  type edgeIdentity = K.identity;
+  let edgeCmp = K.cmp;
+};
+
+let unsafeComparableFromBeltU =
+    (type v, type id, ~id: Belt.Id.comparable(v, id), ~cmp)
+    : comparable(v, id) =>
+  (module
+   UnsafeComparableFromBeltU({
+     module Cmp = (val id);
+     let cmp = cmp;
+   }));
+
+let unsafeComparableFromBelt =
+    (type v, type id, ~id: Belt.Id.comparable(v, id), ~cmp)
+    : comparable(v, id) =>
+  (module
+   UnsafeComparableFromBeltU({
+     let cmp = (. a, b) => cmp(a, b);
+     module Cmp = (val id);
+   }));
+
+module MakeComparableU = (M: {
+                            type t;
+                            let cmp: (. t, t) => int;
+                          }) =>
+  UnsafeComparableFromBeltU({
+    let cmp = M.cmp;
+    module Cmp = Belt.Id.MakeComparableU(M);
   });
 
-module String =
-  Make({
-    type t = string;
-    let cmp: (t, t) => int = compare;
+module MakeComparable = (M: {
+                           type t;
+                           let cmp: (t, t) => int;
+                         }) =>
+  UnsafeComparableFromBeltU({
+    let cmp = {
+      let cmp = M.cmp;
+      (. a, b) => cmp(a, b);
+    };
+    /* This will uncurry `cmp` twice but preserve the module path. */
+    module Cmp = Belt.Id.MakeComparable(M);
   });
+
+let comparable = (type v, cmp): (module Comparable with type t = v) =>
+  (module
+   MakeComparable({
+     type t = v;
+     let cmp = cmp;
+   }));
+
+let comparableU = (type v, cmp): (module Comparable with type t = v) =>
+  (module
+   MakeComparableU({
+     type t = v;
+     let cmp = cmp;
+   }));
+
+module Int = {
+  module Cmp = (val comparableU((. a: int, b: int) => compare(a, b)));
+  type nonrec t = t(Cmp.t, Cmp.identity);
+  let make = make(~id=(module Cmp));
+};
+
+module String = {
+  module Cmp = (val comparableU((. a: string, b: string) => compare(a, b)));
+  type nonrec t = t(Cmp.t, Cmp.identity);
+  let make = make(~id=(module Cmp));
+};

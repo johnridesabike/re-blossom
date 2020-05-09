@@ -1,4 +1,4 @@
-/**
+/*******************************************************************************
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,8 +20,44 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- */
+ ******************************************************************************/
 
+type internalCmp('vertex, 'identity);
+type internalEdgeCmp('v, 'identity, 'vertexIdentity);
+
+module type Comparable = {
+  type t;
+  type identity;
+  type edgeIdentity;
+  let cmp: internalCmp(t, identity);
+  let edgeCmp: internalEdgeCmp(t, edgeIdentity, identity);
+  module BeltCmp:
+    Belt.Id.Comparable with type t = t and type identity = identity;
+};
+
+/**
+ * A module of functions with a unique identity type. It is analogous to the
+ * type `Belt.Id.comparable`. Create one with the `comparable` function or the
+ * `MakeComparable` functor. Or create one with an existing `Belt.Id.comparable`
+ * module with `unsafeComparableFromBelt`.
+ *
+ * ```
+ * module StringCmp = (val comparable(compare: (string, string) => int));
+ *
+ * module IntCmp = MakeComparable({
+ *   type t = int;
+ *   let cmp: (t, t) => int = compare;
+ * });
+ * ```
+ */
+type comparable('vertex, 'identity) = (module Comparable with
+                                          type identity = 'identity and
+                                          type t = 'vertex);
+
+/**
+ * Represents whether or not the algorithm should *only* accept maximum-
+ * cardinality solutions.
+ */
 type cardinality = [ | `Max | `NotMax];
 
 /**
@@ -32,19 +68,16 @@ type t('vertex, 'identity);
 /**
  * Compute a maximum-weighted matching in the general undirected weighted graph.
  *
- * Accepts a list of tuples `(i, j, w)`, each describing an undirected edge seen
+ * Accepts a list of tuples `(i, j, w)`, each describing an undirected edge
  * between vertex `i` and vertex `j` with weight `w`. There is at most one edge
- * between any two vertices; no vertex has an edge to itself. Duplicate edges
- * are ignored.
+ * between any two vertices, and no vertex has an edge to itself. Duplicate
+ * edges are ignored.
  *
- * `id` accepts a first-class module created by `Belt.Id.MakeComparable`.
+ * `id` accepts a first-class module created by `comparable` or
+ * `MakeComparable`.
  *
- * `eq` is a function that accepts two vertices and returns if they are equal.
- *
- * If `cardinality` is set to `` `Max ``, ony maximum-cardinality matchings are
+ * If `cardinality` is set to `` `Max ``, only maximum-cardinality matchings are
  * considered as solutions.
- *
- * Returns a bi-directional, read-only map of each vertex to its mate vertex.
  *
  * This function takes time O(n ** 3).
  */
@@ -52,8 +85,7 @@ let make:
   (
     ~cardinality: cardinality=?,
     list(('vertex, 'vertex, float)),
-    ~id: Belt.Id.comparable('vertex, 'identity),
-    ~cmp: ('vertex, 'vertex) => int
+    ~id: comparable('vertex, 'identity)
   ) =>
   t('vertex, 'identity);
 
@@ -68,14 +100,24 @@ let get: (t('vertex, 'identity), 'vertex) => option('vertex);
  * Takes an uncurried `f` function.
  */
 let reduceU:
-  (t('vertex, 'identity), ~init: 'a, ~f: (. 'a, 'vertex, 'vertex) => 'a) => 'a;
+  (
+    t('vertex, 'identity),
+    ~init: 'acc,
+    ~f: (. 'acc, 'vertex, 'vertex) => 'acc
+  ) =>
+  'acc;
 
 /**
  * Reduces over the pairs of vertex mates. Each pair is used twice, once in each
  * order.
  */
 let reduce:
-  (t('vertex, 'identity), ~init: 'a, ~f: ('a, 'vertex, 'vertex) => 'a) => 'a;
+  (
+    t('vertex, 'identity),
+    ~init: 'acc,
+    ~f: ('acc, 'vertex, 'vertex) => 'acc
+  ) =>
+  'acc;
 
 /**
  * Iterates over the pairs of vertex mates. Each pair is used twice, once in
@@ -113,23 +155,55 @@ let isEmpty: t('vertex, 'identity) => bool;
 let has: (t('vertex, 'identity), 'vertex) => bool;
 
 module Int: {
-  module Cmp: {
-    type t = int;
-    type identity;
-    let cmp: Belt.Id.cmp(t, identity);
-  };
-  let make:
-    (~cardinality: cardinality=?, list((int, int, float))) =>
-    t(int, Cmp.identity);
+  module Cmp: Comparable with type t = int;
+  type nonrec t = t(int, Cmp.identity);
+  let make: (~cardinality: cardinality=?, list((int, int, float))) => t;
 };
 
 module String: {
-  module Cmp: {
-    type t = string;
-    type identity;
-    let cmp: Belt.Id.cmp(t, identity);
-  };
+  module Cmp: Comparable with type t = string;
+  type nonrec t = t(string, Cmp.identity);
   let make:
-    (~cardinality: cardinality=?, list((string, string, float))) =>
-    t(string, Cmp.identity);
+    (~cardinality: cardinality=?, list((string, string, float))) => t;
 };
+
+/**
+ * This is unsafe because we can't guarantee the `cmp` value will be correct.
+ */
+let unsafeComparableFromBelt:
+  (
+    ~id: Belt.Id.comparable('vertex, 'identity),
+    ~cmp: ('vertex, 'vertex) => int
+  ) =>
+  comparable('vertex, 'identity);
+
+/**
+ * This is unsafe because we can't guarantee the `cmp` value will be correct.
+ */
+let unsafeComparableFromBeltU:
+  (
+    ~id: Belt.Id.comparable('vertex, 'identity),
+    ~cmp: (. 'vertex, 'vertex) => int
+  ) =>
+  comparable('vertex, 'identity);
+
+module MakeComparable:
+  (M: {
+     type t;
+     let cmp: (t, t) => int;
+   }) => Comparable with type t = M.t;
+
+module MakeComparableU:
+  (M: {
+     type t;
+     let cmp: (. t, t) => int;
+   }) => Comparable with type t = M.t;
+
+let comparable:
+  (('vertex, 'vertex) => int) => (module Comparable with type t = 'vertex);
+
+let comparableU:
+  ((. 'vertex, 'vertex) => int) => (module Comparable with type t = 'vertex);
+
+let comparableToBelt:
+  comparable('vertex, 'identity) => Belt.Id.comparable('vertex, 'identity);

@@ -138,7 +138,7 @@ of people, and we could potentially match every person with anyone else!
 
 ## Usage
 
-**[For full documentation, see the interface file.](/src/Match.rei)**
+**[For full documentation, see the interface file.](https://github.com/johnridesabike/re-blossom/blob/master/src/Match.rei)**
 
 Your data can be any type, but suppose you're using `string` vertices.
 ```reason
@@ -205,7 +205,8 @@ Blossom.Match.Int.make(~cardinality=`Max, graph);
 ### Your own types
 
 To use your own type, first you need a module that conforms to the
-`Belt.Id.comparable` signature.
+`Blossom.Match.comparable` signature. (If you've used the `Belt.Id` module
+before, this should be familiar.)
 
 ```reason
 module MyType: {
@@ -215,14 +216,27 @@ module MyType: {
   /* implementation goes here */
 };
 
-module MyTypeCmp = Belt.Id.MakeComparable(MyType);
+module MyTypeCmp = Blossom.Match.MakeComparable(MyType);
 ```
 
-Now you can call `Blossom.Match.make` with the `Id` module, the `cmp`function,
-and your list of edges.
+Now you can call `Blossom.Match.make` with the  module and your list of edges.
 
 ```reason
-let result = Blossom.Match.make(~id=(module MyTypeCmp), ~cmp=MyType.cmp, graph);
+let result = Blossom.Match.make(~id=(module MyTypeCmp), graph);
+```
+
+You can also reuse an existing Belt `Comparable` module by using
+`Blossom.Match.unsafeComparableFromBelt`. The advantage to this is that the
+`identity` type is reused and can be shared between structures.
+
+```reason
+module MyTypeCmp = Belt.Id.MakeComparable(MyType);
+let blossomCmp =
+  Blossom.Match.unsafeComparableFromBelt(
+    ~id=(module MyTypeCmp),
+    ~cmp=MyType.cmp
+  );
+let result = Blossom.Match.make(~id=blossomCmp, graph);
 ```
 
 ## Beta warning

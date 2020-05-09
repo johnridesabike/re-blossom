@@ -1,4 +1,4 @@
-/**
+/*******************************************************************************
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,12 +20,15 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- */
+ ******************************************************************************/
 open Jest;
 open Expect;
 
 let sortResult = (l, ~compare) =>
-  Belt.List.sort(l, ((a, _), (b, _)) => compare(a, b));
+  Belt.List.sortU(l, (. (a, _), (b, _)) => compare(a, b));
+
+let sortResultU = (l, ~compare) =>
+  Belt.List.sortU(l, (. (a, _), (b, _)) => compare(. a, b));
 
 describe("Trivial cases", () => {
   test("Empty input graph", () =>
@@ -58,6 +61,13 @@ describe("Trivial cases", () => {
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
+  );
+  test("A simple love triangle", () =>
+    Match.Int.make([(0, 1, 6.), (0, 2, 10.), (1, 2, 5.)])
+    |> Match.toList
+    |> sortResult(~compare)
+    |> expect
+    |> toEqual([(0, 2), (2, 0)])
   );
   test("Maximum cardinality", () =>
     Match.Int.make(
@@ -757,6 +767,8 @@ describe("Input tests", () => {
       ("Peter", "John", 10.),
       ("Paul", "James", 10.),
       ("Gabriel", "Andrew", 30.),
+      ("Gabriel", "Gabriel", 100.),
+      ("Gabriel", "Andrew", 100.),
     ])
     |> Match.toList
     |> sortResult(~compare)
@@ -814,8 +826,7 @@ describe("Input tests", () => {
        *         Joseph ------ 55 ----- Mark ----30---- James  *
        ********************************************************/
       Match.make(
-        ~id=(module Belt.Id.MakeComparable(Person)),
-        ~cmp=Person.cmp,
+        ~id=(module Match.MakeComparable(Person)),
         Person.[
           (Mary, Joseph, 40.),
           (Mary, Matthew, 40.),
@@ -879,8 +890,7 @@ describe("Input tests", () => {
         let cmp = (a, b) => compare(toString(a), toString(b));
       };
       Match.make(
-        ~id=(module Belt.Id.MakeComparable(Person)),
-        ~cmp=Person.cmp,
+        ~id=(module Match.MakeComparable(Person)),
         Person.[
           (Mary, Joseph, 9.),
           (Mary, Matthew, 9.),
@@ -889,6 +899,8 @@ describe("Input tests", () => {
           (Matthew, Luke, 8.),
           (Mark, Luke, 10.),
           (Luke, John, 6.),
+          (Luke, Luke, 100.),
+          (Luke, John, 100.),
         ],
       )
       |> Match.toList
@@ -905,6 +917,94 @@ describe("Input tests", () => {
            ],
          );
     });
+    test("Variants with an uncurried cmp function.", () => {
+      module Person = {
+        type t =
+          | Mary
+          | Joseph
+          | Matthew;
+        let toInt =
+          fun
+          | Mary => 0
+          | Joseph => 1
+          | Matthew => 2;
+        let cmp = (. a, b) => compare(toInt(a), toInt(b));
+      };
+      Match.make(
+        ~id=(module Match.MakeComparableU(Person)),
+        Person.[
+          (Mary, Joseph, 40.),
+          (Mary, Matthew, 30.),
+          (Joseph, Matthew, 20.),
+        ],
+      )
+      |> Match.toList
+      |> sortResultU(~compare=Person.cmp)
+      |> expect
+      |> toEqual(Person.[(Mary, Joseph), (Joseph, Mary)]);
+    });
+    test("Variants and reusing a Belt.Id module.", () => {
+      module Person = {
+        type t =
+          | Mary
+          | Joseph
+          | Matthew;
+        let toInt =
+          fun
+          | Mary => 0
+          | Joseph => 1
+          | Matthew => 2;
+        let cmp = (a, b) => compare(toInt(a), toInt(b));
+      };
+      module PersonCmp = Belt.Id.MakeComparable(Person);
+      Match.make(
+        ~id=
+          Match.unsafeComparableFromBelt(
+            ~id=(module PersonCmp),
+            ~cmp=Person.cmp,
+          ),
+        Person.[
+          (Mary, Joseph, 40.),
+          (Mary, Matthew, 30.),
+          (Joseph, Matthew, 20.),
+        ],
+      )
+      |> Match.toList
+      |> sortResult(~compare=Person.cmp)
+      |> expect
+      |> toEqual(Person.[(Mary, Joseph), (Joseph, Mary)]);
+    });
+    test("Again, with an uncurried cmp function.", () => {
+      module Person = {
+        type t =
+          | Mary
+          | Joseph
+          | Matthew;
+        let toInt =
+          fun
+          | Mary => 0
+          | Joseph => 1
+          | Matthew => 2;
+        let cmp = (. a, b) => compare(toInt(a), toInt(b));
+      };
+      module PersonCmp = Belt.Id.MakeComparableU(Person);
+      Match.make(
+        ~id=
+          Match.unsafeComparableFromBeltU(
+            ~id=(module PersonCmp),
+            ~cmp=Person.cmp,
+          ),
+        Person.[
+          (Mary, Joseph, 40.),
+          (Mary, Matthew, 30.),
+          (Joseph, Matthew, 20.),
+        ],
+      )
+      |> Match.toList
+      |> sortResultU(~compare=Person.cmp)
+      |> expect
+      |> toEqual(Person.[(Mary, Joseph), (Joseph, Mary)]);
+    });
     test("Variant constructors", () => {
       module StringOrInt = {
         type t =
@@ -918,9 +1018,9 @@ describe("Input tests", () => {
           | (Int(_), String(_)) => (-1)
           };
       };
+      module Cmp = (val Match.comparable(StringOrInt.cmp));
       Match.make(
-        ~id=(module Belt.Id.MakeComparable(StringOrInt)),
-        ~cmp=StringOrInt.cmp,
+        ~id=(module Cmp),
         StringOrInt.[
           (Int(1), Int(2), 40.),
           (Int(1), Int(3), 40.),
@@ -997,7 +1097,7 @@ describe("Output tests", () => {
     Belt.Map.eq(
       Match.toMap(result),
       Belt.Map.fromArray(
-        ~id=(module Match.Int.Cmp),
+        ~id=Match.comparableToBelt((module Match.Int.Cmp)),
         [|
           (1, 2),
           (2, 1),
@@ -1036,3 +1136,23 @@ describe("Output tests", () => {
        )
   );
 });
+Skip.describe("Brute force any missed edge cases (slow)", () =>
+  test(
+    "Generate a large number of random graphs and check that the algorithm "
+    ++ "doesn't crash.",
+    () =>
+    {
+      () =>
+        Belt.Range.forEach(0, 1023, _ =>
+          Belt.List.makeBy(63, _ =>
+            Js.Math.(random_int(0, 15), random_int(0, 15), random() *. 100.)
+          )
+          |> Match.Int.make
+          |> ignore
+        );
+    }
+    |> expect
+    |> not
+    |> toThrow
+  )
+);
