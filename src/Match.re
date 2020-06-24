@@ -87,30 +87,28 @@ module ParityList = {
 
     let zero = Empty;
 
-    let rec reduce = (l, ~init, ~f) =>
-      switch (l) {
+    let rec reduce = (~init, ~f) =>
+      fun
       | Empty => init
       | Even(a, Odd(b, tail)) =>
-        reduce(tail, ~init=f(. f(. init, a), b), ~f)
-      };
+        reduce(tail, ~init=f(. f(. init, a), b), ~f);
 
     let reverse = l => {
-      let rec loop = (acc, l) =>
-        switch (l) {
+      let rec aux = acc =>
+        fun
         | Empty => acc
-        | Even(a, Odd(b, tail)) => loop(acc <:> a <.> b, tail)
-        };
-      loop(zero, l);
+        | Even(a, Odd(b, tail)) => aux(acc <:> a <.> b, tail);
+      aux(zero, l);
     };
 
     let concat = (l1, l2) => {
-      let rec loop = (acc, l1, l2) =>
+      let rec aux = (acc, l1, l2) =>
         switch (l1, l2) {
         | (Empty, Empty) => reverse(acc)
         | (Empty as l1, Even(a, Odd(b, l2)))
-        | (Even(a, Odd(b, l1)), l2) => loop(acc <:> a <.> b, l1, l2)
+        | (Even(a, Odd(b, l1)), l2) => aux(acc <:> a <.> b, l1, l2)
         };
-      loop(zero, l1, l2);
+      aux(zero, l1, l2);
     };
   };
 
@@ -120,37 +118,35 @@ module ParityList = {
 
     let one = x => Even.zero <:> x;
 
-    let rec reduce = (Odd(a, tail), ~init, ~f) =>
-      switch (tail) {
-      | Empty => f(. init, a)
-      | Even(b, tail) => reduce(tail, ~init=f(. f(. init, a), b), ~f)
-      };
+    let rec reduce = (~init, ~f) =>
+      fun
+      | Odd(a, Empty) => f(. init, a)
+      | Odd(a, Even(b, tail)) =>
+        reduce(tail, ~init=f(. f(. init, a), b), ~f);
 
     let reverse = (Odd(head, tail)) => {
-      let rec loop = (acc, l) =>
-        switch (l) {
+      let rec aux = acc =>
+        fun
         | Empty => acc
-        | Even(a, Odd(b, tail)) => loop(acc <.> a <:> b, tail)
-        };
-      loop(one(head), tail);
+        | Even(a, Odd(b, tail)) => aux(acc <.> a <:> b, tail);
+      aux(one(head), tail);
     };
 
-    let rec forEach = (Odd(a, tail), ~f) =>
-      switch (tail) {
-      | Empty => f(. a)
-      | Even(b, tail) =>
-        f(. a);
-        f(. b);
-        forEach(tail, ~f);
-      };
+    let rec forEach = (~f) =>
+      fun
+      | Odd(a, Empty) => f(. a)
+      | Odd(a, Even(b, tail)) => {
+          f(. a);
+          f(. b);
+          forEach(tail, ~f);
+        };
 
     let concat = (l1, l2) => {
-      let rec loop = (acc, Odd(a, tail)) =>
-        switch (tail) {
-        | Empty => acc <.> a |> Even.reverse
-        | Even(b, tail) => loop(acc <.> a <:> b, tail)
-        };
-      loop(reverse(l1), l2);
+      let rec aux = acc =>
+        fun
+        | Odd(a, Empty) => acc <.> a |> Even.reverse
+        | Odd(a, Even(b, tail)) => aux(acc <.> a <:> b, tail);
+      aux(reverse(l1), l2);
     };
 
     let concatEven = (Odd(head, tail), l2) =>
@@ -162,13 +158,12 @@ module ParityList = {
      * `f` is only applied to _even_ items.
      */
     let trimTo = (Odd(head, tail), ~f) => {
-      let rec loop = (acc, l) =>
-        switch (l) {
+      let rec aux = acc =>
+        fun
         | Even(a, _) when f(. a) => Some(reverse(acc))
         | Empty => None
-        | Even(a, Odd(b, l)) => loop(acc <.> a <:> b, l)
-        };
-      loop(one(head), tail);
+        | Even(a, Odd(b, tail)) => aux(acc <.> a <:> b, tail);
+      aux(one(head), tail);
     };
 
     /**
@@ -176,12 +171,11 @@ module ParityList = {
      * `f(item) == true`, or return `None` if `f` never returns `true`.
      * `f` is only applied to _odd_ items.
      */
-    let rec trimFrom = (l, ~f) =>
-      switch (l) {
-      | Odd(a, _) when f(. a) => Some(l)
+    let rec trimFrom = (~f) =>
+      fun
+      | Odd(a, _) as l when f(. a) => Some(l)
       | Odd(_, Empty) => None
-      | Odd(_, Even(_, l)) => trimFrom(l, ~f)
-      };
+      | Odd(_, Even(_, tail)) => trimFrom(tail, ~f);
   };
 };
 
@@ -315,7 +309,7 @@ module Edge = {
   /**
    * Return the slack of the given edge. Does not work inside blossoms.
    */
-  let slack = k => k.i.dualVar +. k.j.dualVar -. k.weight;
+  let slack = ({i, j, weight, _}) => i.dualVar +. j.dualVar -. weight;
 
   let _debug = k => {
     let i = k.i.content;
@@ -398,10 +392,7 @@ module Node = {
     | Vertex(_) => false
     };
 
-  let label =
-    fun
-    | Vertex({label, _})
-    | Blossom({label, _}) => label;
+  let label = (Vertex({label, _}) | Blossom({label, _})) => label;
 
   let _debug =
     fun
@@ -417,17 +408,15 @@ module Node = {
      * Reduce over the leaves of a node. Leaves are the vertices in a blossom's
      * children, as well as the vertices in any of its sub-blossom's children.
      */
-    let rec reduce = (b, ~init, ~f) =>
-      switch (b) {
+    let rec reduce = (~init, ~f) =>
+      fun
       | Vertex(vertex) => f(. init, vertex)
       | Blossom({fields: {children, _}, _}) =>
-        ParityList.Odd.reduce(children, ~init, ~f=(. init, child) =>
-          reduce(child.node, ~init, ~f)
-        )
-      };
+        ParityList.Odd.reduce(children, ~init, ~f=(. init, {node, _}) =>
+          reduce(node, ~init, ~f)
+        );
 
-    let toList = (b, ~init) =>
-      reduce(b, ~init, ~f=(. leaves, v) => [v, ...leaves]);
+    let toList = reduce(~f=(. leaves, v) => [v, ...leaves]);
 
     let _debug = b =>
       b->toList(~init=[])->Belt.List.map(Vertex._debug)->Belt.List.toArray;
@@ -449,12 +438,13 @@ module Child = {
 module Mates = {
   /**
    * Maps vertices to remote endpoints of their attached edges.
-   * */
+   */
   type t('v, 'id) = Belt.Map.Dict.t('v, Endpoint.t('v), 'id);
 
   let empty = Belt.Map.Dict.empty;
 
-  let get = (mates, v, ~cmp) => Belt.Map.Dict.get(mates, v.content, ~cmp);
+  let getExn = (mates, v, ~cmp) =>
+    Belt.Map.Dict.getExn(mates, v.content, ~cmp);
 
   let setEdge = (mates, edge, ~cmp) =>
     mates
@@ -499,10 +489,12 @@ module Label = {
     | Blossom(b) =>
       b.label = label;
       b.bestEdge = None;
-    | Vertex(_) => ()
+      v.bestEdge = None;
+      v.label = label;
+    | Vertex(_) =>
+      v.bestEdge = None;
+      v.label = label;
     };
-    v.bestEdge = None;
-    v.label = label;
     Node.Leaves.toList(b, ~init=queue);
   };
 
@@ -523,16 +515,15 @@ module Label = {
     | Blossom(b) =>
       b.label = label;
       b.bestEdge = None;
-    | Vertex(_) => ()
+      v.bestEdge = None;
+      v.label = label;
+    | Vertex(_) =>
+      v.bestEdge = None;
+      v.label = label;
     };
-    v.bestEdge = None;
-    v.label = label;
-    switch (Mates.get(mates, Node.baseVertex(b), ~cmp)) {
-    | None => failwith("Needed mate.")
-    | Some(matep) =>
-      let mate = Endpoint.toVertex(matep);
-      assignS(~v=mate, ~label=S(Endpoint.reverse(matep)), ~queue);
-    };
+    let matep = Mates.getExn(mates, Node.baseVertex(b), ~cmp);
+    let mate = Endpoint.toVertex(matep);
+    assignS(~v=mate, ~label=S(Endpoint.reverse(matep)), ~queue);
   };
 
   /**
@@ -555,12 +546,12 @@ module Label = {
  ******************************************************************************/
 
 module RawEdge: {
-  type t('v) = pri | Valid('v, 'v);
+  type t('v) = pri | Edge('v, 'v);
   let make: ('v, 'v, ~cmp: (. 'v, 'v) => int) => option(t('v));
   let makeCmp: ((. 'v, 'v) => int) => (. t('v), t('v)) => int;
 } = {
   type t('v) =
-    | Valid('v, 'v);
+    | Edge('v, 'v);
 
   /**
    * It's important that edges are always in the same order.
@@ -568,14 +559,14 @@ module RawEdge: {
   let makeRawEdge = (i, j, ~cmp) =>
     switch (cmp(. i, j)) {
     | 0 => None
-    | x when x > 0 => Some(Valid(i, j))
-    | _ => Some(Valid(j, i))
+    | x when x > 0 => Some(Edge(i, j))
+    | _ => Some(Edge(j, i))
     };
   /* Aliasing `make` and `makeRawEdge` for better JavaScript debugging. */
   let make = makeRawEdge;
 
   let makeCmp = vertexCmp =>
-    (. Valid(a, b), Valid(y, z)) =>
+    (. Edge(a, b), Edge(y, z)) =>
       switch (vertexCmp(. a, y), vertexCmp(. b, z)) {
       | (0, 0) => 0
       | (c, d) =>
@@ -620,7 +611,7 @@ module Graph = {
        and edges. We use a Map and Set to do this efficiently. */
     module M = (val id);
     let cmp = M.BeltCmp.cmp;
-    let rec loop =
+    let rec aux =
             (
               ~rawEdges,
               ~edges,
@@ -632,6 +623,8 @@ module Graph = {
             ) =>
       switch (rawEdges) {
       | [] =>
+        /* Once all the edges have processed, loop over the vertices again
+           to set the dualVars and then return the graph. */
         let rec setMaxWeight = (
           fun
           | [v, ...rest] => {
@@ -652,7 +645,7 @@ module Graph = {
       | [(iContent, jContent, weight), ...rawEdges] =>
         switch (RawEdge.make(iContent, jContent, ~cmp=M.cmp)) {
         | None =>
-          loop(
+          aux(
             ~rawEdges,
             ~edges,
             ~edgeSet,
@@ -663,7 +656,7 @@ module Graph = {
           )
         | Some(rawEdge)
             when Belt.Set.Dict.has(edgeSet, rawEdge, ~cmp=M.edgeCmp) =>
-          loop(
+          aux(
             ~rawEdges,
             ~edges,
             ~edgeSet,
@@ -672,10 +665,11 @@ module Graph = {
             ~vertexSize,
             ~maxWeight,
           )
-        | Some(RawEdge.Valid(iContent, jContent) as rawEdge) =>
+        | Some(Edge(iContent, jContent) as rawEdge) =>
           let maxWeight = max(maxWeight, weight);
           let edgeSet = Belt.Set.Dict.add(edgeSet, rawEdge, ~cmp=M.edgeCmp);
-          /* See if `i` or `j` are already created. If they are, update them. */
+          /* See if `i` or `j` are already created.
+             If they are, then update them. */
           switch (
             Belt.Map.Dict.get(vertexMap, iContent, ~cmp),
             Belt.Map.Dict.get(vertexMap, jContent, ~cmp),
@@ -684,7 +678,7 @@ module Graph = {
             let edge = {i, j, weight, allowable: NotAllowed};
             i.fields.neighbors = [J(edge), ...i.fields.neighbors];
             j.fields.neighbors = [I(edge), ...j.fields.neighbors];
-            loop(
+            aux(
               ~rawEdges,
               ~edges=[edge, ...edges],
               ~edgeSet,
@@ -707,13 +701,13 @@ module Graph = {
               },
             };
             i.fields.neighbors = [J(edge), ...i.fields.neighbors];
-            loop(
+            aux(
               ~rawEdges,
               ~edges=[edge, ...edges],
               ~edgeSet,
               ~vertices=[j, ...vertices],
-              ~vertexMap=Belt.Map.Dict.set(vertexMap, jContent, j, ~cmp),
               ~vertexSize=succ(vertexSize),
+              ~vertexMap=Belt.Map.Dict.set(vertexMap, jContent, j, ~cmp),
               ~maxWeight,
             );
           | (None, Some(j)) =>
@@ -730,13 +724,13 @@ module Graph = {
               },
             };
             j.fields.neighbors = [I(edge), ...j.fields.neighbors];
-            loop(
+            aux(
               ~rawEdges,
               ~edges=[edge, ...edges],
               ~edgeSet,
               ~vertices=[i, ...vertices],
-              ~vertexMap=Belt.Map.Dict.set(vertexMap, iContent, i, ~cmp),
               ~vertexSize=succ(vertexSize),
+              ~vertexMap=Belt.Map.Dict.set(vertexMap, iContent, i, ~cmp),
               ~maxWeight,
             );
           | (None, None) =>
@@ -763,22 +757,22 @@ module Graph = {
                 inBlossom: Vertex(j),
               },
             };
-            loop(
+            aux(
               ~rawEdges,
               ~edges=[edge, ...edges],
               ~edgeSet,
               ~vertices=[i, j, ...vertices],
+              ~vertexSize=vertexSize |> succ |> succ,
               ~vertexMap=
                 vertexMap
                 ->Belt.Map.Dict.set(iContent, i, ~cmp)
                 ->Belt.Map.Dict.set(jContent, j, ~cmp),
-              ~vertexSize=vertexSize |> succ |> succ,
               ~maxWeight,
             );
           };
         }
       };
-    loop(
+    aux(
       ~rawEdges,
       ~vertices=[],
       ~edges=[],
@@ -792,7 +786,7 @@ module Graph = {
   let make = makeGraph;
 
   let updateDualVarsByDelta = (graph, ~delta) => {
-    let rec updateVertices =
+    let rec auxVertices =
       fun
       | [] => ()
       | [v, ...rest] => {
@@ -806,11 +800,11 @@ module Graph = {
             | Free => v.dualVar
             };
           };
-          updateVertices(rest);
+          auxVertices(rest);
         };
-    let rec updateBlossoms =
+    let rec auxBlossoms =
       fun
-      | [] => updateVertices(graph.vertices)
+      | [] => auxVertices(graph.vertices)
       | [b, ...rest] => {
           b.dualVar = {
             switch (b) {
@@ -822,9 +816,9 @@ module Graph = {
             | {label: Free, _} => b.dualVar
             };
           };
-          updateBlossoms(rest);
+          auxBlossoms(rest);
         };
-    updateBlossoms(graph.blossoms);
+    auxBlossoms(graph.blossoms);
   };
 };
 
@@ -914,27 +908,27 @@ module AddBlossom = {
    * Trace back from the given edge's vertices to discover either a new blossom
    * or an augmenting path.
    */
-  let scanForBlossom = edge => {
+  let scanForBlossom = ({i, j, _} as edge) => {
     [%log.debug
       "scanBlossom";
-      ("v", Vertex._debug(edge.i));
-      ("w", Vertex._debug(edge.j))
+      ("v", Vertex._debug(i));
+      ("w", Vertex._debug(j))
     ];
     open ParityList;
-    let rec loop = (frontPath, backPath) =>
+    let rec aux = (frontPath, backPath) =>
       switch (frontPath, backPath) {
       | (DeadEnd(_, _), DeadEnd(_, _)) => AugmentingPath
       | (DeadEnd(lastV, front) as frontPath, FoundChild(nextW, back)) =>
         switch (findConnection(lastV, nextW, front, back)) {
         /* The first front child was a SingleS; the back traced around to it. */
         | Some(children) => NewBlossom(children)
-        | None => loop(frontPath, traceBackward(nextW, back))
+        | None => aux(frontPath, traceBackward(nextW, back))
         }
       | (FoundChild(lastV, front), DeadEnd(nextW, back) as backPath) =>
         switch (findConnection(lastV, nextW, front, back)) {
         /* The first back child was a SingleS; the front traced around to it. */
         | Some(children) => NewBlossom(children)
-        | None => loop(traceForward(lastV, front), backPath)
+        | None => aux(traceForward(lastV, front), backPath)
         }
       | (FoundChild(lastV, front), FoundChild(nextW, back)) =>
         switch (findConnection(lastV, nextW, front, back)) {
@@ -944,18 +938,18 @@ module AddBlossom = {
           | FoundChild(nextW, back) as backPath =>
             switch (findConnection(lastV, nextW, front, back)) {
             | Some(children) => NewBlossom(children)
-            | None => loop(traceForward(lastV, front), backPath)
+            | None => aux(traceForward(lastV, front), backPath)
             }
           | DeadEnd(_) as backPath =>
-            loop(traceForward(lastV, front), backPath)
+            aux(traceForward(lastV, front), backPath)
           }
         }
       };
-    let initialV = edge.i.fields.inBlossom;
-    loop(
+    let initialV = i.fields.inBlossom;
+    aux(
       /* Manually add the i child to connect the two lists. */
       FoundChild(initialV, Odd.one({node: initialV, endpoint: I(edge)})),
-      FoundChild(edge.j.fields.inBlossom, Even.zero),
+      FoundChild(j.fields.inBlossom, Even.zero),
     );
   };
 
@@ -966,61 +960,58 @@ module AddBlossom = {
    * with the new edge. If the node has not been set yet, then add it with the
    * new edge.
    */
-  let setBestEdgeMap = (bestEdgeMap, ~w, ~edge) => {
+  let setBestEdgeMap = (~w, ~edge, map) => {
     /* This does not preserve the order, which should not matter. */
-    let rec loop = (acc, bestEdgeMap, hasBeenSet) =>
-      switch (bestEdgeMap) {
+    let rec aux = (~acc, ~hasBeenSet) =>
+      fun
       | [] => hasBeenSet ? acc : [{w, edge}, ...acc]
+      | [{w: w', edge: edge'}, ...bestEdgeMap]
+          when Node.eq(w, w') && Edge.(slack(edge) < slack(edge')) =>
+        aux(~acc=[{w, edge}, ...acc], ~hasBeenSet=true, bestEdgeMap)
       | [bestEdge, ...bestEdgeMap] =>
-        let {w: w', edge: edge'} = bestEdge;
-        if (Node.eq(w, w') && Edge.(slack(edge) < slack(edge'))) {
-          loop([{w, edge}, ...acc], bestEdgeMap, true);
-        } else {
-          loop([bestEdge, ...acc], bestEdgeMap, hasBeenSet);
-        };
-      };
-    loop([], bestEdgeMap, false);
+        aux(~acc=[bestEdge, ...acc], ~hasBeenSet, bestEdgeMap);
+    aux(~acc=[], ~hasBeenSet=false, map);
   };
 
   let bestEdgesReducerHelper = (~b, ~neighbor as w, ~bestEdgeMap, ~edge) =>
     switch (Node.label(w)) {
     | SingleS
-    | S(_) when !Node.eqB(w, b) => setBestEdgeMap(bestEdgeMap, ~w, ~edge)
+    | S(_) when !Node.eqB(w, b) => setBestEdgeMap(~w, ~edge, bestEdgeMap)
     | SingleS
     | S(_)
     | Free
     | T(_) => bestEdgeMap
     };
 
-  let rec endpointReducer = (~neighbors, ~bestEdgeMap, ~b) =>
-    switch (neighbors) {
+  let rec endpointReducer = (~b, ~bestEdgeMap) =>
+    fun
     | [] => bestEdgeMap
-    | [endpoint, ...neighbors] =>
-      let bestEdgeMap =
-        bestEdgesReducerHelper(
-          ~b,
-          ~neighbor=Endpoint.toVertex(endpoint).fields.inBlossom,
-          ~bestEdgeMap,
-          ~edge=Endpoint.toEdge(endpoint),
-        );
-      endpointReducer(~bestEdgeMap, ~neighbors, ~b);
-    };
+    | [endpoint, ...neighbors] => {
+        let bestEdgeMap =
+          bestEdgesReducerHelper(
+            ~b,
+            ~neighbor=Endpoint.toVertex(endpoint).fields.inBlossom,
+            ~bestEdgeMap,
+            ~edge=Endpoint.toEdge(endpoint),
+          );
+        endpointReducer(~b, ~bestEdgeMap, neighbors);
+      };
 
-  let rec bestEdgesReducer = (~b, ~blossomBestEdges, ~bestEdgeMap) =>
-    switch (blossomBestEdges) {
+  let rec bestEdgesReducer = (~b, ~bestEdgeMap) =>
+    fun
     | [] => bestEdgeMap
-    | [{edge, _}, ...blossomBestEdges] =>
-      let bestEdgeMap =
-        bestEdgesReducerHelper(
-          ~b,
-          ~neighbor=
-            Node.eqB(edge.j.fields.inBlossom, b)
-              ? edge.i.fields.inBlossom : edge.j.fields.inBlossom,
-          ~bestEdgeMap,
-          ~edge,
-        );
-      bestEdgesReducer(~bestEdgeMap, ~blossomBestEdges, ~b);
-    };
+    | [{edge, _}, ...blossomBestEdges] => {
+        let bestEdgeMap =
+          bestEdgesReducerHelper(
+            ~b,
+            ~neighbor=
+              Node.eqB(edge.j.fields.inBlossom, b)
+                ? edge.i.fields.inBlossom : edge.j.fields.inBlossom,
+            ~bestEdgeMap,
+            ~edge,
+          );
+        bestEdgesReducer(~b, ~bestEdgeMap, blossomBestEdges);
+      };
 
   let computeBestEdges = b =>
     ParityList.Odd.reduce(
@@ -1037,11 +1028,11 @@ module AddBlossom = {
               node,
               ~init=bestEdgeMap,
               ~f=(. bestEdgeMap, {fields: {neighbors, _}, _}) =>
-              endpointReducer(~neighbors, ~bestEdgeMap, ~b)
+              endpointReducer(~bestEdgeMap, ~b, neighbors)
             )
           /* Walk this sub-blossom's least-slack edges. */
           | Blossom({fields: {blossomBestEdges, _}, _}) =>
-            bestEdgesReducer(~b, ~bestEdgeMap, ~blossomBestEdges)
+            bestEdgesReducer(~b, ~bestEdgeMap, blossomBestEdges)
           };
         /* Forget about least-slack edges of this sub-blossom. */
         switch (node) {
@@ -1081,13 +1072,14 @@ module AddBlossom = {
       }
     );
     /* Relabel the vertices. */
+    let blossom = Blossom(b); /* minor performance gain to construct it once. */
     let queue =
       Node.Leaves.reduce(
-        Blossom(b),
+        blossom,
         ~init=queue,
         ~f=(. queue, v) => {
           let oldLabel = Node.label(v.fields.inBlossom);
-          v.fields.inBlossom = Blossom(b);
+          v.fields.inBlossom = blossom;
           switch (oldLabel) {
           /* This T-Vertex now turns into an S-vertex because it becomes part
              of an S-blossom; add it to the queue. */
@@ -1111,7 +1103,7 @@ module AddBlossom = {
             | None => Some(edge)
             | Some(newBestEdge) when Edge.(slack(edge) < slack(newBestEdge)) =>
               Some(edge)
-            | _ => b.bestEdge
+            | Some(_) => b.bestEdge
             };
           };
           getBestEdge(rest);
@@ -1151,11 +1143,10 @@ module ModifyBlossom = {
    * Remove the base child and split the remaining children into two lists, one
    * before and one and after the entry child.
    */
-  let splitChildren = (children, entryChild) => {
+  let splitChildren = (Odd(base, rest), entryChild) => {
     open Node.Infix;
     open ParityList.Infix;
-    let Odd(base, rest) = children;
-    let rec loop = (front, back) =>
+    let rec aux = (front, back) =>
       switch (back) {
       | Empty when base.node =|= entryChild => NoSplit({base, rest})
       | Empty => failwith("Entry child not found.")
@@ -1169,17 +1160,16 @@ module ModifyBlossom = {
           back,
         })
       | Even(child, Odd(child', back)) =>
-        loop(front <:> child <.> child', back)
+        aux(front <:> child <.> child', back)
       };
-    loop(Even.zero, rest);
+    aux(Even.zero, rest);
   };
 
-  let rec bubbleBlossomTree = (node, parent, b) =>
-    switch (parent) {
+  let rec bubbleBlossomTree = (node, b) =>
+    fun
     | None => failwith("There should be a parent.")
     | Some(parent) when Blossom.eq(parent, b) => node
-    | Some(parent) => bubbleBlossomTree(Blossom(parent), parent.parent, b)
-    };
+    | Some(parent) => bubbleBlossomTree(Blossom(parent), b, parent.parent);
 
   type direction =
     | Backward
@@ -1200,7 +1190,7 @@ module ModifyBlossom = {
     open ParityList.Infix;
     /* Bubble up through the blossom tree from from the vertex to an immediate
        sub-blossom of `b`. */
-    let t = bubbleBlossomTree(Vertex(v), v.parent, b);
+    let t = bubbleBlossomTree(Vertex(v), b, v.parent);
     /* Recursively deal with the first sub-blossom. */
     let mates =
       switch (t) {
@@ -1223,69 +1213,68 @@ module ModifyBlossom = {
         (moveList, Backward, children);
       };
     b.fields.children = children;
-    let rec loopToBase = (moveList, mates) =>
-      switch (moveList) {
+    let rec loopToBase = mates =>
+      fun
       | Empty => mates
       /* Step into the next two sub-blossoms and augment them recursively. */
-      | Even(child, Odd(child', rest)) =>
-        let p =
-          switch (direction) {
-          | Forward => child.endpoint
-          | Backward => Endpoint.reverse(child'.endpoint)
-          };
-        let mates =
-          switch (child.node) {
-          | Blossom(b) => augment(b, Endpoint.toVertex(p), mates, ~cmp)
-          | Vertex(_) => mates
-          };
-        let mates =
-          switch (child'.node) {
-          | Blossom(b) =>
-            augment(b, Endpoint.toReverseVertex(p), mates, ~cmp)
-          | Vertex(_) => mates
-          };
-        /* Match the edge connecting those sub-blossoms. */
-        let mates = Mates.setEdge(mates, Endpoint.toEdge(p), ~cmp);
-        [%log.debug
-          "PAIR";
-          ("v", p |> Endpoint.toVertex |> Vertex._debug);
-          ("w", p |> Endpoint.toReverseVertex |> Vertex._debug)
-        ];
-        loopToBase(rest, mates);
-      };
-    loopToBase(moveList, mates);
+      | Even(child, Odd(child', rest)) => {
+          let p =
+            switch (direction) {
+            | Forward => child.endpoint
+            | Backward => Endpoint.reverse(child'.endpoint)
+            };
+          let mates =
+            switch (child.node) {
+            | Blossom(b) => augment(b, Endpoint.toVertex(p), mates, ~cmp)
+            | Vertex(_) => mates
+            };
+          let mates =
+            switch (child'.node) {
+            | Blossom(b) =>
+              augment(b, Endpoint.toReverseVertex(p), mates, ~cmp)
+            | Vertex(_) => mates
+            };
+          /* Match the edge connecting those sub-blossoms. */
+          let mates = Mates.setEdge(mates, Endpoint.toEdge(p), ~cmp);
+          [%log.debug
+            "PAIR";
+            ("v", p |> Endpoint.toVertex |> Vertex._debug);
+            ("w", p |> Endpoint.toReverseVertex |> Vertex._debug)
+          ];
+          loopToBase(mates, rest);
+        };
+    loopToBase(mates, moveList);
   };
 
-  let rec relabelToBase =
-          (childsToBase, nextEndpoint, queue, mates, direction, ~cmp) =>
-    switch (childsToBase) {
+  let rec relabelToBase = (nextEndpoint, queue, mates, direction, ~cmp) =>
+    fun
     | Odd(_, Empty) => (nextEndpoint, queue)
-    | Odd({endpoint, _}, Even({endpoint: endpoint', _}, rest)) =>
-      Endpoint.toEdge(endpoint).allowable = Allowed;
-      Endpoint.toEdge(endpoint').allowable = Allowed;
-      let queue =
-        Label.assignT(
-          ~v=Endpoint.toReverseVertex(nextEndpoint),
-          ~p=nextEndpoint,
-          ~mates,
-          ~queue,
-          ~cmp,
-        );
-      let nextEndpoint =
-        switch (direction) {
-        | Forward => endpoint'
-        | Backward =>
-          let Odd({endpoint, _}, _) = rest;
-          Endpoint.reverse(endpoint);
-        };
-      Endpoint.toEdge(nextEndpoint).allowable = Allowed;
-      relabelToBase(rest, nextEndpoint, queue, mates, direction, ~cmp);
-    };
+    | Odd({endpoint, _}, Even({endpoint: endpoint', _}, rest)) => {
+        Endpoint.toEdge(endpoint).allowable = Allowed;
+        Endpoint.toEdge(endpoint').allowable = Allowed;
+        let queue =
+          Label.assignT(
+            ~v=Endpoint.toReverseVertex(nextEndpoint),
+            ~p=nextEndpoint,
+            ~mates,
+            ~queue,
+            ~cmp,
+          );
+        let nextEndpoint =
+          switch (direction) {
+          | Forward => endpoint'
+          | Backward =>
+            let Odd({endpoint, _}, _) = rest;
+            Endpoint.reverse(endpoint);
+          };
+        Endpoint.toEdge(nextEndpoint).allowable = Allowed;
+        relabelToBase(~cmp, nextEndpoint, queue, mates, direction, rest);
+      };
 
   /**
    * Expand the given top-level blossom.
    */
-  let rec expand = (~graph, ~b, ~stage, ~mates, ~queue) => {
+  let rec expand = (~graph as {cmp, _} as graph, ~b, ~stage, ~mates, ~queue) => {
     let _debug_endstage =
       switch (stage) {
       | Endstage => "Endstage"
@@ -1341,23 +1330,23 @@ module ModifyBlossom = {
           | GoForward({base, front, entry, back}) =>
             let (endpoint, queue) =
               relabelToBase(
-                Odd.concat(back, Odd.one(base)) <:> entry,
                 labelEndpoint,
                 queue,
                 mates,
                 Forward,
-                ~cmp=graph.cmp,
+                ~cmp,
+                Odd.concat(back, Odd.one(base)) <:> entry,
               );
             (base.node, endpoint, front, queue);
           | GoBackward({base, front, entry, back}) =>
             let (endpoint, queue) =
               relabelToBase(
-                front <.> base |> Even.reverse <:> entry,
                 labelEndpoint,
                 queue,
                 mates,
                 Backward,
-                ~cmp=graph.cmp,
+                ~cmp,
+                front <.> base |> Even.reverse <:> entry,
               );
             (base.node, endpoint, back, queue);
           };
@@ -1383,18 +1372,18 @@ module ModifyBlossom = {
           | T(_) =>
             /* If the sub-blossom contains a reachable vertex, assign label T to
                the sub-blossom. */
-            let rec labelReachableVertex = leaves =>
-              switch (leaves) {
+            let rec labelReachableVertex = (
+              fun
               | [] => queue
-              | [v, ...rest] =>
-                switch (v.label) {
-                | Free => labelReachableVertex(rest)
-                | T(p) =>
-                  Label.assignT(~v, ~p, ~mates, ~queue, ~cmp=graph.cmp)
-                | SingleS
-                | S(_) => failwith("Must be labeled Free or T.")
+              | [v, ...rest] => {
+                  switch (v.label) {
+                  | Free => labelReachableVertex(rest)
+                  | T(p) => Label.assignT(~v, ~p, ~mates, ~queue, ~cmp)
+                  | SingleS
+                  | S(_) => failwith("Must be labeled Free or T.")
+                  };
                 }
-              };
+            );
             Node.Leaves.toList(child.node, ~init=[]) |> labelReachableVertex;
           }
         });
@@ -1405,18 +1394,14 @@ module ModifyBlossom = {
       };
 
     /* This reverses the list, but that shouldn't matter. */
-    let rec removeBlossom = (newL, l) =>
-      switch (l) {
-      | [] =>
-        graph.blossoms = newL;
-        queue;
-      | [b', ...rest] =>
-        if (Blossom.eq(b, b')) {
-          removeBlossom(newL, rest);
-        } else {
-          removeBlossom([b', ...newL], rest);
+    let rec removeBlossom = newList =>
+      fun
+      | [] => {
+          graph.blossoms = newList;
+          queue;
         }
-      };
+      | [b', ...rest] when Blossom.eq(b, b') => removeBlossom(newList, rest)
+      | [b', ...rest] => removeBlossom([b', ...newList], rest);
     removeBlossom([], graph.blossoms);
   };
 };
@@ -1440,85 +1425,82 @@ module Delta = {
     | Four(delta, _) => {j|4=$delta|j};
 
   let getMinDualVar = ({vertices, maxWeight, _}) => {
-    let rec loop = (minDualVar, vertices) =>
-      switch (vertices) {
+    let rec aux = minDualVar =>
+      fun
       | [] => minDualVar
-      | [{dualVar, _}, ...rest] => loop(min(minDualVar, dualVar), rest)
-      };
-    loop(maxWeight, vertices);
+      | [{dualVar, _}, ...rest] => aux(min(minDualVar, dualVar), rest);
+    aux(maxWeight, vertices);
   };
 
-  let finalize = (deltaType, ~graph) =>
-    switch (deltaType) {
+  let finalize = (~graph) =>
+    fun
     | Some(deltaType) => deltaType
-    | None =>
-      /* No further improvement possible; max-cardinality optimum reached.
-         Do a final delta update to make the optimum verifiable. */
-      /* (Note that we aren't currently verifying the optimum.) */
-      let delta = getMinDualVar(graph);
-      One(max(delta, 0.));
-    };
+    | None => {
+        /* No further improvement possible; max-cardinality optimum reached.
+           Do a final delta update to make the optimum verifiable. */
+        /* (Note that we aren't currently verifying the optimum.) */
+        let delta = getMinDualVar(graph);
+        One(max(delta, 0.));
+      };
 
   /**
    * Compute delta4: minimum z variable of any T-blossom.
    */
   let four = (deltaType, ~graph) => {
-    let rec loop = (deltaType, l) =>
-      switch (l) {
+    let rec aux = deltaType =>
+      fun
       | [] => finalize(deltaType, ~graph)
-      | [b, ...rest] =>
-        let deltaType =
-          switch (b) {
-          | {parent: None, label: T(_), dualVar, _} =>
-            switch (deltaType) {
-            | None => Some(Four(dualVar, b))
-            | Some(
-                One(delta) | Two(delta, _) | Three(delta, _) |
-                Four(delta, _),
-              )
-                when dualVar < delta =>
-              Some(Four(dualVar, b))
-            | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
-            }
-          | {label: Free | SingleS | S(_) | T(_), _} => deltaType
-          };
-        loop(deltaType, rest);
-      };
-    loop(deltaType, graph.blossoms);
+      | [b, ...rest] => {
+          let deltaType =
+            switch (b) {
+            | {parent: None, label: T(_), dualVar, _} =>
+              switch (deltaType) {
+              | None => Some(Four(dualVar, b))
+              | Some(
+                  One(delta) | Two(delta, _) | Three(delta, _) |
+                  Four(delta, _),
+                )
+                  when dualVar < delta =>
+                Some(Four(dualVar, b))
+              | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
+              }
+            | {label: Free | SingleS | S(_) | T(_), _} => deltaType
+            };
+          aux(deltaType, rest);
+        };
+    aux(deltaType, graph.blossoms);
   };
 
-  let threeHelper = (deltaType, node) =>
-    switch (node) {
-    | {parent: None, bestEdge: Some(edge), label: SingleS | S(_), _} =>
-      let kslack = Edge.slack(edge) /. 2.;
-      switch (deltaType) {
-      | None => Some(Three(kslack, edge))
-      | Some(
-          One(delta) | Two(delta, _) | Three(delta, _) | Four(delta, _),
-        )
-          when kslack < delta =>
-        Some(Three(kslack, edge))
-      | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
-      };
-    | {label: Free | SingleS | S(_) | T(_), _} => deltaType
-    };
+  let threeHelper = deltaType =>
+    fun
+    | {parent: None, bestEdge: Some(edge), label: SingleS | S(_), _} => {
+        let kslack = Edge.slack(edge) /. 2.;
+        switch (deltaType) {
+        | None => Some(Three(kslack, edge))
+        | Some(
+            One(delta) | Two(delta, _) | Three(delta, _) | Four(delta, _),
+          )
+            when kslack < delta =>
+          Some(Three(kslack, edge))
+        | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
+        };
+      }
+    | {label: Free | SingleS | S(_) | T(_), _} => deltaType;
 
   /**
    * Compute delta3: half the minimum slack on any edge between a pair of
    * S-blossoms.
    */
   let three = (deltaType, ~graph) => {
-    let rec blossoms = (deltaType, l) =>
-      switch (l) {
+    let rec auxBlossoms = deltaType =>
+      fun
       | [] => four(deltaType, ~graph)
-      | [b, ...rest] => blossoms(threeHelper(deltaType, b), rest)
-      };
-    let rec vertices = (deltaType, l) =>
-      switch (l) {
-      | [] => blossoms(deltaType, graph.blossoms)
-      | [v, ...rest] => vertices(threeHelper(deltaType, v), rest)
-      };
-    vertices(deltaType, graph.vertices);
+      | [b, ...rest] => auxBlossoms(threeHelper(deltaType, b), rest);
+    let rec auxVertices = deltaType =>
+      fun
+      | [] => auxBlossoms(deltaType, graph.blossoms)
+      | [v, ...rest] => auxVertices(threeHelper(deltaType, v), rest);
+    auxVertices(deltaType, graph.vertices);
   };
 
   /**
@@ -1526,29 +1508,29 @@ module Delta = {
    * free vertex.
    */
   let two = (deltaType, ~graph) => {
-    let rec loop = (deltaType, l) =>
-      switch (l) {
+    let rec aux = deltaType =>
+      fun
       | [] => three(deltaType, ~graph)
-      | [v, ...rest] =>
-        let deltaType =
-          switch (v.bestEdge, Node.label(v.fields.inBlossom)) {
-          | (Some(edge), Free) =>
-            let kslack = Edge.slack(edge);
-            switch (deltaType) {
-            | None => Some(Two(kslack, edge))
-            | Some(
-                One(delta) | Two(delta, _) | Three(delta, _) |
-                Four(delta, _),
-              )
-                when kslack < delta =>
-              Some(Two(kslack, edge))
-            | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
+      | [v, ...rest] => {
+          let deltaType =
+            switch (v.bestEdge, Node.label(v.fields.inBlossom)) {
+            | (Some(edge), Free) =>
+              let kslack = Edge.slack(edge);
+              switch (deltaType) {
+              | None => Some(Two(kslack, edge))
+              | Some(
+                  One(delta) | Two(delta, _) | Three(delta, _) |
+                  Four(delta, _),
+                )
+                  when kslack < delta =>
+                Some(Two(kslack, edge))
+              | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
+              };
+            | (_, Free | SingleS | S(_) | T(_)) => deltaType
             };
-          | (_, Free | SingleS | S(_) | T(_)) => deltaType
-          };
-        loop(deltaType, rest);
-      };
-    loop(deltaType, graph.vertices);
+          aux(deltaType, rest);
+        };
+    aux(deltaType, graph.vertices);
   };
 
   /**
@@ -1562,7 +1544,6 @@ module Delta = {
       };
     two(deltaType, ~graph);
   };
-
   let make = one;
 };
 
@@ -1642,140 +1623,145 @@ module Substage = {
     ->Augmented;
   };
 
-  let scanNeighbors = (vertex, graph, mates, queue) => {
-    let rec loop = (neighbors, queue) =>
-      switch (neighbors) {
+  let scanNeighbors = (~vertex, ~graph, ~mates, ~queue) => {
+    let {cmp, _} = graph;
+    let {fields: {inBlossom, neighbors, _}, _} = vertex;
+    let rec aux = (~queue) =>
+      fun
       | [] => NotAugmented(queue, mates)
-      | [endpoint, ...neighbors] =>
-        let edge = Endpoint.toEdge(endpoint);
-        let neighbor = Endpoint.toVertex(endpoint);
-        /* This edge is internal to a blossom; ignore it. */
-        if (Node.eq(vertex.fields.inBlossom, neighbor.fields.inBlossom)) {
-          loop(neighbors, queue);
-        } else {
-          let kslack = Edge.slack(edge);
-          /* Edge has zero slack => it is allowable. */
-          switch (edge.allowable) {
-          | NotAllowed when kslack <= 0. => edge.allowable = Allowed
-          | Allowed
-          | NotAllowed => ()
-          };
-          switch (edge.allowable) {
-          | Allowed =>
-            switch (Node.label(neighbor.fields.inBlossom)) {
-            /* (C1) neighbor is a free vertex; label with T and label its mate
-               with S (R12). */
-            | Free =>
-              let queue =
-                Label.assignT(
-                  ~v=neighbor,
-                  ~p=Endpoint.reverse(endpoint),
-                  ~mates,
-                  ~queue,
-                  ~cmp=graph.cmp,
-                );
-              loop(neighbors, queue);
-            /* (C2) neighbor is an S-vertex (not in the same blossom; follow
-               back-links to discover either an augmenting path or a new
-               blossom. */
-            | SingleS
-            | S(_) =>
-              switch (AddBlossom.scanForBlossom(edge)) {
-              /* Found a new blossom; add it to the blossom bookkeeping and
-                 turn it into an S-blossom. */
-              | AddBlossom.NewBlossom(children) =>
-                let ParityList.Odd({node: _debug_node, _}, _) = children;
-                [%log.debug
-                  "addBlossom";
-                  ("base", Node._debug(_debug_node));
-                  ("v", Vertex._debug(edge.i));
-                  ("w", Vertex._debug(edge.j))
-                ];
-                [%log.debug
-                  "blossomChildren";
-                  ("children", Child._debug(children))
-                ];
-                let queue = AddBlossom.make(graph, children, queue);
-                loop(neighbors, queue);
-              /* Found an augmenting path; augment the matching and end this
-                 stage. */
-              | AddBlossom.AugmentingPath =>
-                augmentMatching(edge, mates, ~cmp=graph.cmp)
-              }
-            | T(_) =>
-              switch (neighbor.label) {
-              /* Neighbor is inside a T-blossom, but itself has not yet been
-                 reached from outside the blossom; mark it as reached (we need
-                 to relabel during T-blossom expansion). */
+      | [endpoint, ...neighbors] => {
+          let neighbor = Endpoint.toVertex(endpoint);
+          /* This edge is internal to a blossom; ignore it. */
+          if (Node.eq(inBlossom, neighbor.fields.inBlossom)) {
+            aux(~queue, neighbors);
+          } else {
+            let edge = Endpoint.toEdge(endpoint);
+            let kslack = Edge.slack(edge);
+            /* Edge has zero slack => it is allowable. */
+            switch (edge.allowable) {
+            | NotAllowed when kslack <= 0. => edge.allowable = Allowed
+            | Allowed
+            | NotAllowed => ()
+            };
+            switch (edge.allowable) {
+            | Allowed =>
+              switch (Node.label(neighbor.fields.inBlossom)) {
+              /* (C1) neighbor is a free vertex; label with T and label its mate
+                 with S (R12). */
               | Free =>
-                Label.assignTSingleVertex(
-                  ~v=neighbor,
-                  ~p=Endpoint.reverse(endpoint),
-                );
-                loop(neighbors, queue);
+                let queue =
+                  Label.assignT(
+                    ~v=neighbor,
+                    ~p=Endpoint.reverse(endpoint),
+                    ~mates,
+                    ~queue,
+                    ~cmp,
+                  );
+                aux(~queue, neighbors);
+              /* (C2) neighbor is an S-vertex (not in the same blossom; follow
+                 back-links to discover either an augmenting path or a new
+                 blossom. */
               | SingleS
-              | S(_)
-              | T(_) => loop(neighbors, queue)
+              | S(_) =>
+                switch (AddBlossom.scanForBlossom(edge)) {
+                /* Found a new blossom; add it to the blossom bookkeeping and
+                   turn it into an S-blossom. */
+                | AddBlossom.NewBlossom(children) =>
+                  let ParityList.Odd({node: _debug_node, _}, _) = children;
+                  [%log.debug
+                    "addBlossom";
+                    ("base", Node._debug(_debug_node));
+                    ("v", Vertex._debug(edge.i));
+                    ("w", Vertex._debug(edge.j))
+                  ];
+                  [%log.debug
+                    "blossomChildren";
+                    ("children", Child._debug(children))
+                  ];
+                  let queue = AddBlossom.make(graph, children, queue);
+                  aux(~queue, neighbors);
+                /* Found an augmenting path; augment the matching and end this
+                   stage. */
+                | AddBlossom.AugmentingPath =>
+                  augmentMatching(edge, mates, ~cmp)
+                }
+              | T(_) =>
+                switch (neighbor.label) {
+                /* Neighbor is inside a T-blossom, but itself has not yet been
+                   reached from outside the blossom; mark it as reached (we need
+                   to relabel during T-blossom expansion). */
+                | Free =>
+                  Label.assignTSingleVertex(
+                    ~v=neighbor,
+                    ~p=Endpoint.reverse(endpoint),
+                  );
+                  aux(~queue, neighbors);
+                | SingleS
+                | S(_)
+                | T(_) => aux(~queue, neighbors)
+                }
               }
-            }
-          | NotAllowed =>
-            switch (Node.label(neighbor.fields.inBlossom)) {
-            | SingleS
-            | S(_) =>
-              /* Keep track of the least-slack non-allowable edge to a different
-                 S-blossom. */
-              switch (vertex.fields.inBlossom) {
-              | Blossom({bestEdge: None, _} as b) => b.bestEdge = Some(edge)
-              | Vertex({bestEdge: None, _} as v) => v.bestEdge = Some(edge)
-              | Blossom({bestEdge: Some(bestEdge), _} as b)
-                  when kslack < Edge.slack(bestEdge) =>
-                b.bestEdge = Some(edge)
-              | Vertex({bestEdge: Some(bestEdge), _} as v)
-                  when kslack < Edge.slack(bestEdge) =>
-                v.bestEdge = Some(edge)
-              | Blossom(_)
-              | Vertex(_) => ()
-              };
-              loop(neighbors, queue);
-            | Free
-            | T(_) =>
-              switch (neighbor.label) {
-              | Free =>
-                /* Neighbor is a free vertex (or an unreached vertex inside a
-                   T-blossom) but we cannot reach it yet; keep track of the
-                   least-slack edge that reaches it. */
-                switch (neighbor.bestEdge) {
-                | None => neighbor.bestEdge = Some(edge)
-                | Some(bestEdge) when kslack < Edge.slack(bestEdge) =>
-                  neighbor.bestEdge = Some(edge)
-                | _ => ()
+            | NotAllowed =>
+              switch (Node.label(neighbor.fields.inBlossom)) {
+              | SingleS
+              | S(_) =>
+                /* Keep track of the least-slack non-allowable edge to a different
+                   S-blossom. */
+                switch (inBlossom) {
+                | Blossom({bestEdge: None, _} as b) =>
+                  b.bestEdge = Some(edge)
+                | Vertex({bestEdge: None, _} as v) =>
+                  v.bestEdge = Some(edge)
+                | Blossom({bestEdge: Some(bestEdge), _} as b)
+                    when kslack < Edge.slack(bestEdge) =>
+                  b.bestEdge = Some(edge)
+                | Vertex({bestEdge: Some(bestEdge), _} as v)
+                    when kslack < Edge.slack(bestEdge) =>
+                  v.bestEdge = Some(edge)
+                | Blossom(_)
+                | Vertex(_) => ()
                 };
-                loop(neighbors, queue);
-              | SingleS
-              | S(_)
-              | T(_) => loop(neighbors, queue)
+                aux(~queue, neighbors);
+              | Free
+              | T(_) =>
+                switch (neighbor.label) {
+                | Free =>
+                  /* Neighbor is a free vertex (or an unreached vertex inside a
+                     T-blossom) but we cannot reach it yet; keep track of the
+                     least-slack edge that reaches it. */
+                  switch (neighbor.bestEdge) {
+                  | None => neighbor.bestEdge = Some(edge)
+                  | Some(bestEdge) when kslack < Edge.slack(bestEdge) =>
+                    neighbor.bestEdge = Some(edge)
+                  | _ => ()
+                  };
+
+                  aux(~queue, neighbors);
+                | SingleS
+                | S(_)
+                | T(_) => aux(~queue, neighbors)
+                }
               }
-            }
+            };
           };
         };
-      };
-    loop(vertex.fields.neighbors, queue);
+    aux(~queue, neighbors);
   };
 
   /**
    * Continue labeling until all vertices which are reachable through an
    * alternating path have gotten a label.
    */
-  let rec labelingLoop = (graph, mates, queue) =>
-    switch (queue) {
-    | [] => NotAugmented(queue, mates)
-    | [vertex, ...queue] =>
-      [%log.debug "POP"; ("Vertex", Vertex._debug(vertex))];
-      switch (scanNeighbors(vertex, graph, mates, queue)) {
-      | NotAugmented(queue, mates) => labelingLoop(graph, mates, queue)
-      | Augmented(_) as augmented => augmented
+  let rec labelingLoop = (graph, mates) =>
+    fun
+    | [] => NotAugmented([], mates)
+    | [vertex, ...queue] => {
+        [%log.debug "POP"; ("Vertex", Vertex._debug(vertex))];
+        switch (scanNeighbors(~vertex, ~graph, ~mates, ~queue)) {
+        | NotAugmented(queue, mates) => labelingLoop(graph, mates, queue)
+        | Augmented(_) as augmented => augmented
+        };
       };
-    };
 
   let rec substage = (graph, queue, mates, cardinality) => {
     %log.debug
@@ -1812,12 +1798,12 @@ module Substage = {
         edge.allowable = Allowed;
         substage(graph, queue, mates, cardinality);
       /* Expand the least-z blossom. */
-      | Delta.Four(delta, blossom) =>
+      | Delta.Four(delta, b) =>
         Graph.updateDualVarsByDelta(graph, ~delta);
         let queue =
           ModifyBlossom.expand(
             ~graph,
-            ~b=blossom,
+            ~b,
             ~stage=NotEndstage,
             ~queue,
             ~mates,
@@ -1835,44 +1821,44 @@ module Substage = {
  * Remove labels, forget least-slack edges and allowable edges, and empty queue.
  */
 let resetStage = (~graph, ~mates) => {
+  let {vertices, blossoms, edges, cmp, _} = graph;
   /* Label all single blossoms/vertices with S and put them in the queue. */
-  let rec resetVerticesAndQueue = (queue, vertices) =>
-    switch (vertices) {
-    | [] => queue
-    | [v, ...rest] =>
-      /* Forget all about least-slack edges. */
-      v.bestEdge = None;
-      if (Mates.has(mates, v, ~cmp=graph.cmp)) {
-        v.label = Free;
-        resetVerticesAndQueue(queue, rest);
-      } else {
-        let queue = Label.assignS(~v, ~label=SingleS, ~queue);
-        resetVerticesAndQueue(queue, rest);
-      };
-    };
-  let rec resetBlossoms =
+  let rec auxVerticesAndQueue = queue =>
     fun
-    | [] => resetVerticesAndQueue([], graph.vertices)
+    | [] => queue
+    | [v, ...rest] when Mates.has(mates, v, ~cmp) => {
+        v.bestEdge = None; /* Forget all about least-slack edges. */
+        v.label = Free;
+        auxVerticesAndQueue(queue, rest);
+      }
+    | [v, ...rest] => {
+        v.bestEdge = None; /* Forget all about least-slack edges. */
+        let queue = Label.assignS(~v, ~label=SingleS, ~queue);
+        auxVerticesAndQueue(queue, rest);
+      };
+  let rec auxBlossoms =
+    fun
+    | [] => auxVerticesAndQueue([], vertices)
     | [b, ...rest] => {
         b.bestEdge = None;
         b.fields.blossomBestEdges = [];
         b.label = Free;
-        resetBlossoms(rest);
+        auxBlossoms(rest);
       };
   /* Loss of labeling means that we can not be sure that currently allowable
      edges remain allowable throughout this stage. */
-  let rec resetEdges =
+  let rec auxEdges =
     fun
-    | [] => resetBlossoms(graph.blossoms)
+    | [] => auxBlossoms(blossoms)
     | [k, ...rest] => {
         k.allowable = NotAllowed;
-        resetEdges(rest);
+        auxEdges(rest);
       };
-  resetEdges(graph.edges);
+  auxEdges(edges);
 };
 
 let expandAllSBlossoms = (~graph, ~mates, ~queue) => {
-  let rec loop =
+  let rec aux =
     fun
     | [] => ()
     | [b, ...rest] => {
@@ -1882,9 +1868,9 @@ let expandAllSBlossoms = (~graph, ~mates, ~queue) => {
           |> ignore
         | {label: Free | SingleS | S(_) | T(_), _} => ()
         };
-        loop(rest);
+        aux(rest);
       };
-  loop(graph.blossoms);
+  aux(graph.blossoms);
 };
 
 /*******************************************************************************
@@ -1904,7 +1890,7 @@ let make = (~cardinality=`NotMax, edges, ~id) => {
   /**
    * Loop until no further improvement is possible.
    */
-  let rec loop = (~mates, ~stageNum) =>
+  let rec aux = (mates, stageNum) =>
     if (stageNum == graph.vertexSize) {
       Belt.Map.packIdData(~id=comparableToBelt(id), ~data=Mates.empty);
     } else {
@@ -1919,10 +1905,10 @@ let make = (~cardinality=`NotMax, edges, ~id) => {
       | Substage.Augmented(mates) =>
         /* End of a stage; expand all S-blossoms which have `dualVar` = 0. */
         expandAllSBlossoms(~graph, ~mates, ~queue);
-        loop(~mates, ~stageNum=succ(stageNum));
+        aux(mates, succ(stageNum));
       };
     };
-  loop(~mates=Mates.empty, ~stageNum=0);
+  aux(Mates.empty, 0);
 };
 
 let get = (mates, v) =>
