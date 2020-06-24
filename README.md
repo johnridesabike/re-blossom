@@ -279,6 +279,10 @@ git clone https://github.com/johnridesabike/re-blossom.git
 If you want to make your own changes, then it's recommended to fork the
 repository on GitHub and clone your forked version.
 
+The repository includes an [esy](https://esy.sh) configuration to support Merlin
+and OCaml LSP development environments. To use it, be sure you launch your
+editor with the `esy` command, such as `esy vim`.
+
 Install the dependencies:
 ```sh
 npm install

@@ -9,3 +9,4 @@ npm-debug.log
 .vscode
 *.swp
 *.swo
+/_esy/
