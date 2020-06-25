@@ -1,7 +1,7 @@
 {
   "name": "re-blossom",
   "namespace": "Blossom",
-  "version": "1.0",
+  "version": "1.1.1",
   "sources": [
     {
       "dir": "src",

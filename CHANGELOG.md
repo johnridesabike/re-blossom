@@ -1,5 +1,8 @@
 # Re-Blossom Changelog
 
+## 1.1.1
+- Improved documentation.
+
 ## 1.1
 - Replaced `Belt.Id.comparable` with a custom `comparable` type.
 - Added `Match.MakeComparable` and `Match.MakeComparableU` functors.

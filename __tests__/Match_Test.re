@@ -1128,7 +1128,9 @@ describe("Output tests", () => {
     Match.has(result, 5) |> expect |> toBe(true)
   );
   test("reduce", () =>
-    Match.reduce(result, ~init="", ~f=(acc, v1, v2) => {j|($v1, $v2), $acc|j})
+    Match.reduce(result, ~init="", ~f=(acc, v1, v2) =>
+      Belt.Int.("(" ++ toString(v1) ++ ", " ++ toString(v2) ++ "), " ++ acc)
+    )
     |> expect
     |> toBe(
          "(10, 8), (9, 4), (8, 10), (7, 6), (6, 7), (5, 3), (4, 9), (3, 5), "

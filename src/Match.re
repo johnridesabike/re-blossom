@@ -585,16 +585,18 @@ module RawEdge: {
    constructs the graph, it's more performant to initialize the module
    beforehand. */
 
-type internalCmp('v, 'id) = (. 'v, 'v) => int;
+module Internal = {
+  type cmp('v, 'id) = (. 'v, 'v) => int;
 
-type internalEdgeCmp('v, 'id, 'vId) = Belt.Id.cmp(RawEdge.t('v), 'id);
+  type edgeCmp('v, 'id, 'vId) = Belt.Id.cmp(RawEdge.t('v), 'id);
+};
 
 module type Comparable = {
   type t;
   type identity;
   type edgeIdentity;
-  let cmp: internalCmp(t, identity);
-  let edgeCmp: internalEdgeCmp(t, edgeIdentity, identity);
+  let cmp: Internal.cmp(t, identity);
+  let edgeCmp: Internal.edgeCmp(t, edgeIdentity, identity);
   module BeltCmp:
     Belt.Id.Comparable with type t = t and type identity = identity;
 };

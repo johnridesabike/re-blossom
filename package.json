@@ -12,7 +12,8 @@
     "bench": "npm run build && node ./lib/js/__benchmarks__/Node.bs.js",
     "browser": "serve .",
     "preversion": "npm test",
-    "postversion": "git push && git push --tags"
+    "postversion": "git push && git push --tags",
+    "docs": "bsb -make-world && bsdoc build Blossom"
   },
   "keywords": [
     "BuckleScript",
@@ -50,6 +51,7 @@
     "@glennsl/bs-jest": "^0.5.1",
     "benchmark": "^2.1.4",
     "bs-platform": "^8.0.2",
+    "bsdoc": "^6.0.2-alpha",
     "edmonds-blossom": "^1.0.0",
     "serve": "^11.3.2"
   },
