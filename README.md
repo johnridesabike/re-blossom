@@ -1,7 +1,6 @@
 # Res-Blossom 🌺
 
 ![GitHub package.json version](https://img.shields.io/github/package-json/v/johnridesabike/re-blossom)
-![npm peer dependency version](https://img.shields.io/npm/dependency-version/re-blossom/peer/bs-platform?label=ReScript)
 ![Node.js CI](https://github.com/johnridesabike/re-blossom/workflows/Node.js%20CI/badge.svg)
 ![GitHub](https://img.shields.io/github/license/johnridesabike/re-blossom)
 
