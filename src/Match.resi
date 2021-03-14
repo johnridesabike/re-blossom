@@ -1,4 +1,4 @@
-/* ******************************************************************************
+/**
   MIT License
 
   Copyright (c) 2020 John Jackson
@@ -20,7 +20,7 @@
   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
- ******************************************************************************/
+ */
 @@text("
 {b Res-Blossom} is a {{: https://rescript-lang.org/} ReScript} implementation of
 the famous {{: https://en.wikipedia.org/wiki/Blossom_algorithm} blossom algorithm}.
@@ -63,7 +63,7 @@ tournament round.
 Your first step is to list all of your possible pairings.
 
 {[
-let graph = [
+let graph = list{
   (Mary, Joseph),
   (Mary, Matthew),
   (Joseph, Matthew),
@@ -75,7 +75,7 @@ let graph = [
   (Peter, John),
   (Andrew, Philip),
   (Mark, James)
-];
+}
 ]}
 
 (Typically your list will be much longer, but this is just an illustration.)
@@ -84,7 +84,7 @@ Next, you will need to determine the {i weight} of each pairing. This is a
 floating-point number that indicates how desirable that pairing is.
 
 {[
-let graph = [
+let graph = list{
   (Mary, Joseph, 40.),
   (Mary, Matthew, 40.),
   (Joseph, Matthew, 60.),
@@ -96,7 +96,7 @@ let graph = [
   (Peter, John, 10.),
   (Andrew, Philip, 10.),
   (Mark, James, 10.)
-];
+}
 ]}
 
 In graph theory, each of the people is a \"vertex,\" and each pair of people is
@@ -114,6 +114,120 @@ an \"edge.\" We can visualize it in 2D space.
          Joseph ------ 55 ----- Mark ----30---- James
 </pre>%}
 
+Note that we couldn't use the edge with the highest weight because choosing it
+would leave another vertex with no connections. We also have to use the two
+edges with the lowest weights because we're committed to matching as many
+vertices as possible.
+
+As you can see, finding the {i maximum} weighted matching is often unintuitive.
+Imagine how much more difficult this becomes when you have dozens, or hundreds,
+of people, and we could potentially match every person with anyone else!
+
+{1:usage Usage}
+
+Your data can be any type, but suppose you're using [string] vertices.
+
+{[
+let graph = list{
+  (\"Mary\", \"Joseph\", 40.),
+  (\"Mary\", \"Michael\", 40.),
+  (\"Joseph\", \"Michael\", 60.),
+  (\"Joseph\", \"Gabriel\", 55.),
+  (\"Michael\", \"Raphael\", 55.),
+  (\"Gabriel\", \"Raphael\", 50.),
+  (\"Mary\", \"Paul\", 15.),
+  (\"Raphael\", \"Peter\", 30.),
+  (\"Peter\", \"John\", 10.),
+  (\"Paul\", \"James\", 10.),
+  (\"Gabriel\", \"Andrew\", 30.),
+}
+]}
+
+You can match them with {!String.make}.
+
+{[
+let result = Blossom.Match.String.make(graph)
+]}
+
+You can also use {!Int.make} for integer vertices.
+
+{2 Using the output}
+
+The algorithm returns a bi-directional map of each vertex to its mate vertex.
+
+{[
+Blossom.Match.get(result, \"Mary\") == Some(\"Joseph\")
+Blossom.Match.get(result, \"Joseph\") == Some(\"Mary\")
+]}
+
+It's powered by [Belt.Map] under the hood. You can convert it to a proper
+[Belt.Map] with {!toMap}, or a list with {!toList}. {i The output of these will
+have each pairing twice.} This is because it treats each order ([(a, b)] vs
+[(b, a)]) separately. In practice, this is useful so you can use [Belt.Map.get]
+or [Belt.List.getAssoc] to get any vertex's mate.
+
+{2 Maximum cardinality}
+
+The {!make} functions accepts one optional parameter, [cardinality], which can
+be the value [#Max]. This enables \"maximum cardinality\" matching, where the
+algorithm will only accept solutions that use as many edges as possible, even
+extremely undesirable ones (such as ones with negative weights).
+
+{[
+let graph = list{
+  (1, 2, 2.),
+  (1, 3, (-2.)),
+  (2, 3, 1.),
+  (2, 4, (-1.)),
+  (3, 4, (-6.)),
+}
+
+let result = Blossom.Match.Int.make(graph)
+/* result: (1, 2) */
+
+let result = Blossom.Match.Int.make(~cardinality=#Max, graph)
+/* result: (1, 3), (2, 4) */
+]}
+
+{2 Your own types}
+
+To use your own type, first you need a module that conforms to the
+{!type:comparable} signature. (If you've used the [Belt.Id] module before, this
+should be familiar.)
+
+{[
+module MyType: {
+  type t
+  let cmp: (t, t) => int
+} = {
+  /* implementation goes here */
+}
+
+module MyTypeCmp = Blossom.Match.MakeComparable(MyType)
+]}
+
+Now you can call {!make} with the  module and your list of edges.
+
+{[
+let result = Blossom.Match.make(~id=module(MyTypeCmp), graph)
+]}
+
+You can also reuse an existing Belt [Comparable] module by using
+{!unsafeComparableFromBelt}. The use case for that is when you need the
+[identity] type shared between modules.
+
+{1 Beta warning}
+
+This algorithm passes all of the tests from similar implementations, but hasn't
+seen much real-world use. There may still be failure states that have not been
+discovered yet. The specific dangers are [Failure] exceptions, infinite loops,
+or missing pairings. These should never happen, but, if they do, please
+{{: https://github.com/johnridesabike/re-blossom/issues} file an issue} with
+information about your graph.
+
+{1 Interface}
+
+{2 Types}
 ")
 
 module Internal: {
@@ -267,14 +381,14 @@ let toList: t<'vertex, 'id> => list<('vertex, 'vertex)>
 @ocaml.doc("
   Returns [true] if there are no mates, [false] otherwise.
 
-  {[Blossom.Match.isEmpty(result) == false;]}
+  {[Blossom.Match.isEmpty(result) == false]}
  ")
 let isEmpty: t<'vertex, 'id> => bool
 
 @ocaml.doc("
   Returns [true] if the vertex has a mate, [false] otherwise.
 
-  {[Blossom.Match.has(result, \"Mary\") == true;]}
+  {[Blossom.Match.has(result, \"Mary\") == true]}
  ")
 let has: (t<'vertex, 'id>, 'vertex) => bool
 
@@ -336,8 +450,8 @@ let unsafeComparableFromBeltU: (
   Creates a {!type:comparable}.
   {[
   module IntCmp = Blossom.Match.MakeComparable({
-    type t = int;
-    let cmp: (t, t) => int = compare;
+    type t = int
+    let cmp: (t, t) => int = compare
   })
   ]}
  ")
