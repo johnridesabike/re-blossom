@@ -108,11 +108,13 @@ let formatResult = ({BenchmarkJs.Benchmark.name: name, hz, _}, maxHz) => (
 let make = (suite, jsBlossom) => {
   open BenchmarkJs
   suite
-  ->add("Re-Blossom: Integers", () => List.forEachU(BenchData.Int.data, (. x) => Match.Int.make(x)))
+  ->add("Res-Blossom: Integers", () =>
+    List.forEachU(BenchData.Int.data, (. x) => Match.Int.make(x))
+  )
   ->add("JS Blossom: Integers", () =>
     List.forEachU(BenchData.Int.data, (. x) => jsBlossom(. List.toArray(x)))
   )
-  ->add("Re-Blossom: Strings ", () =>
+  ->add("Res-Blossom: Strings ", () =>
     List.forEachU(BenchData.String.data, (. x) => Match.String.make(x))
   )
   ->add("JS Blossom: Strings ", () =>

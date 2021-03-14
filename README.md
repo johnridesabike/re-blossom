@@ -1,4 +1,4 @@
-# Re-Blossom 🌺
+# Res-Blossom 🌺
 
 ![GitHub package.json version](https://img.shields.io/github/package-json/v/johnridesabike/re-blossom)
 ![npm peer dependency version](https://img.shields.io/npm/dependency-version/re-blossom/peer/bs-platform?label=BuckleScript)

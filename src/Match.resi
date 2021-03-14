@@ -393,7 +393,7 @@ types.
 {2 Python}
 
 {{: http://jorisvr.nl/article/maximum-matching} Joris van Rantwijk's Python
-implementation} was the basis of both the JavaScript version and this Reason
+implementation} was the basis of both the JavaScript version and this ReScript
 version.
 
 {1 Credits}

@@ -24,5 +24,5 @@
 
 {
   open Benchmarks
-  make(BenchmarkJs.make("Re-Blossom vs JS Blossom"), JsBlossom.make)
+  make(BenchmarkJs.make("Res-Blossom vs JS Blossom"), JsBlossom.make)
 }
