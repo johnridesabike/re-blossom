@@ -1,10 +1,11 @@
 {
-  "name": "re-blossom",
+  "name": "res-blossom",
   "version": "1.1.0",
-  "description": "A Reason implementation of the blossom maximum-matching algorithm",
+  "description": "A ReScript implementation of the blossom maximum-matching algorithm",
   "scripts": {
     "build": "bsb -make-world",
     "start": "bsb -make-world -w",
+    "start:logger": "RES_LOG=res-blossom=* bsb -make-world -w",
     "clean": "bsb -clean-world",
     "pretest": "npm run build",
     "test": "jest",
@@ -16,9 +17,7 @@
     "docs": "bsb -make-world && bsdoc build Blossom"
   },
   "keywords": [
-    "BuckleScript",
-    "Reason",
-    "ReasonML",
+    "ReScript",
     "Maximum Weighted Matching",
     "Maximum Matching",
     "Matching",
@@ -44,18 +43,15 @@
     "src/**/*.rei",
     "bsconfig.json"
   ],
-  "peerDependencies": {
-    "bs-platform": "^8.0.2"
-  },
   "devDependencies": {
-    "@glennsl/bs-jest": "^0.5.1",
+    "@glennsl/bs-jest": "^0.6.0",
     "benchmark": "^2.1.4",
-    "bs-platform": "^8.0.2",
-    "bsdoc": "^6.0.2-alpha",
+    "bs-platform": "^9.0.2",
+    "bsdoc": "^6.0.4-alpha",
     "edmonds-blossom": "^1.0.0",
     "serve": "^11.3.2"
   },
   "dependencies": {
-    "bs-log": "^1.2.0"
+    "rescript-logger": "^2.0.0"
   }
 }

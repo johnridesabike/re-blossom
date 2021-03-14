@@ -1,28 +1,28 @@
-/*******************************************************************************
-  MIT License
+@@text("
+MIT License
 
-  Copyright (c) 2020 John Jackson
+Copyright (c) 2020 John Jackson
 
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the \"Software\"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-  SOFTWARE.
- ******************************************************************************/
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+")
 module Int = {
-  let large = [
+  let large = list{
     (0, 1, 37.333333333333336),
     (0, 2, 52.),
     (0, 3, 41.33333333333333),
@@ -175,9 +175,9 @@ module Int = {
     (15, 16, 10.666666666666666),
     (15, 17, 44.),
     (16, 17, 42.4),
-  ];
+  }
 
-  let nastyCase = [
+  let nastyCase = list{
     (1, 2, 45.),
     (1, 7, 45.),
     (2, 3, 50.),
@@ -191,9 +191,9 @@ module Int = {
     (5, 9, 36.),
     (7, 10, 26.),
     (11, 12, 5.),
-  ];
+  }
 
-  let longLabelPath = [
+  let longLabelPath = list{
     (10, 6, 30.),
     (10, 9, 55.),
     (10, 8, 50.),
@@ -206,9 +206,9 @@ module Int = {
     (1, 2, 40.),
     (2, 8, 55.),
     (8, 7, 30.),
-  ];
+  }
 
-  let fiveChildren = [
+  let fiveChildren = list{
     (9, 8, 30.),
     (9, 5, 55.),
     (9, 3, 6.),
@@ -223,10 +223,10 @@ module Int = {
     (3, 4, 16.),
     (2, 1, 55.),
     (1, 0, 43.),
-  ];
+  }
 
-  let data = [
-    [
+  let data = list{
+    list{
       (1, 2, 45.),
       (1, 5, 45.),
       (2, 3, 50.),
@@ -237,8 +237,8 @@ module Int = {
       (4, 8, 35.),
       (5, 7, 26.),
       (9, 10, 5.),
-    ],
-    [
+    },
+    list{
       (1, 2, 45.),
       (1, 5, 45.),
       (2, 3, 50.),
@@ -249,8 +249,8 @@ module Int = {
       (4, 8, 26.),
       (5, 7, 40.),
       (9, 10, 5.),
-    ],
-    [
+    },
+    list{
       (1, 2, 45.),
       (1, 5, 45.),
       (2, 3, 50.),
@@ -261,8 +261,8 @@ module Int = {
       (4, 8, 28.),
       (5, 7, 26.),
       (9, 10, 5.),
-    ],
-    [
+    },
+    list{
       (1, 2, 40.),
       (1, 3, 40.),
       (2, 3, 60.),
@@ -274,52 +274,54 @@ module Int = {
       (7, 6, 10.),
       (8, 10, 10.),
       (4, 9, 30.),
-    ],
+    },
     nastyCase,
     large,
     longLabelPath,
     fiveChildren,
-  ];
-};
+  }
+}
 
-module Make = (M: {
-                 type t;
-                 let ofInt: int => t;
-                 let cmp: (t, t) => int;
-               }) => {
-  type t = M.t;
-  let cmp = M.cmp;
-  let convertEdge = ((i, j, w)) => (M.ofInt(i), M.ofInt(j), w);
-  let data = Belt.List.map(Int.data, l => Belt.List.map(l, convertEdge));
-  module Cmp = Belt.Id.MakeComparable(M);
-};
+module Make = (
+  M: {
+    type t
+    let ofInt: int => t
+    let cmp: (t, t) => int
+  },
+) => {
+  type t = M.t
+  let cmp = M.cmp
+  let convertEdge = ((i, j, w)) => (M.ofInt(i), M.ofInt(j), w)
+  let data = Belt.List.map(Int.data, l => Belt.List.map(l, convertEdge))
+  module Cmp = Belt.Id.MakeComparable(M)
+}
 
-module String =
-  Make({
-    type t = string;
-    let ofInt =
-      fun
-      | 0 => "a"
-      | 1 => "b"
-      | 2 => "c"
-      | 3 => "d"
-      | 4 => "e"
-      | 5 => "f"
-      | 6 => "g"
-      | 7 => "h"
-      | 8 => "i"
-      | 9 => "j"
-      | 10 => "k"
-      | 11 => "l"
-      | 12 => "m"
-      | 13 => "n"
-      | 14 => "o"
-      | 15 => "p"
-      | 16 => "q"
-      | 17 => "r"
-      | _ => "darkness";
-    let cmp: (string, string) => int = compare;
-  });
+module String = Make({
+  type t = string
+  let ofInt = x =>
+    switch x {
+    | 0 => "a"
+    | 1 => "b"
+    | 2 => "c"
+    | 3 => "d"
+    | 4 => "e"
+    | 5 => "f"
+    | 6 => "g"
+    | 7 => "h"
+    | 8 => "i"
+    | 9 => "j"
+    | 10 => "k"
+    | 11 => "l"
+    | 12 => "m"
+    | 13 => "n"
+    | 14 => "o"
+    | 15 => "p"
+    | 16 => "q"
+    | 17 => "r"
+    | _ => "darkness"
+    }
+  let cmp: (string, string) => int = compare
+})
 
 /*
 module PersonType = {
@@ -388,5 +390,4 @@ module PersonType = {
 module Person = Make(PersonType);
 */
 
-let default = () =>
-  Belt.List.forEachU(Int.data, (. data) => Match.Int.make(data));
+let default = () => Belt.List.forEachU(Int.data, (. data) => Match.Int.make(data))
