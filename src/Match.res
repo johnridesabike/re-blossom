@@ -1,7 +1,7 @@
 @@text("
 MIT License
 
-Copyright (c) 2020 John Jackson
+Copyright (c) 2021 John Jackson
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the \"Software\"), to deal
@@ -50,9 +50,6 @@ label, not its own. The dynamic nature of these variables makes it a challenge
 to enforce labels in an efficient way.
 
 Performance isn't everything, but regressions should be avoided.
-
-This code uses features from the BuckleScript compiler to output performant
-JavaScript. It will require modification to compile on other platforms.
 ")
 
 @@text("
@@ -169,15 +166,11 @@ module ParityList = {
   }
 }
 
-type stage =
-  | Endstage
-  | NotEndstage
+type stage = Endstage | NotEndstage
 
 type cardinality = [#Max | #NotMax]
 
-type allowable =
-  | Allowed
-  | NotAllowed
+type allowable = Allowed | NotAllowed
 
 type rec graph<'v, 'id> = {
   vertices: list<vertex<'v>>,
@@ -265,9 +258,7 @@ and child<'v> = {
   /* The endpoint that connects the child to the next child in the list. */
   endpoint: endpoint<'v>,
 }
-and anyNode<'v> =
-  | Vertex(vertex<'v>)
-  | Blossom(blossom<'v>)
+and anyNode<'v> = Vertex(vertex<'v>) | Blossom(blossom<'v>)
 @ocaml.doc("
  Top-level blossoms are either unlabeled (\"free\"), labeled S with no
  endpoint, S with an endpoint, or T with an endpoint.
@@ -372,8 +363,7 @@ module Node = {
     switch (a, b) {
     | (Vertex(a), Vertex(b)) => Vertex.eq(a, b)
     | (Blossom(a), Blossom(b)) => Blossom.eq(a, b)
-    | (Vertex(_), Blossom(_))
-    | (Blossom(_), Vertex(_)) => false
+    | (Vertex(_), Blossom(_)) | (Blossom(_), Vertex(_)) => false
     }
 
   let eqB = (a, b) =>
@@ -732,9 +722,7 @@ module Graph = {
       | list{v, ...rest} =>
         v.dualVar = switch Node.label(v.fields.inBlossom) {
         /* S-vertex: u = u - delta */
-        | SingleS
-        | S(_) =>
-          v.dualVar -. delta
+        | SingleS | S(_) => v.dualVar -. delta
         /* T-vertex: u = u + delta */
         | T(_) => v.dualVar +. delta
         | Free => v.dualVar
@@ -750,9 +738,7 @@ module Graph = {
         | {parent: None, label: SingleS | S(_), _} => b.dualVar +. delta
         /* top-level T-blossom: z = z - delta */
         | {parent: None, label: T(_), _} => b.dualVar -. delta
-        | {parent: Some(_), _}
-        | {label: Free, _} =>
-          b.dualVar
+        | {parent: Some(_), _} | {label: Free, _} => b.dualVar
         }
         auxBlossoms(rest)
       }
@@ -781,17 +767,12 @@ module AddBlossom = {
    ")
   let traceBackward = (w, backChildren) =>
     switch Node.label(w) {
-    | Free
-    | SingleS =>
-      DeadEnd(w, backChildren)
+    | Free | SingleS => DeadEnd(w, backChildren)
     | T(_) => failwith("Label should only be S.")
     | S(p) =>
       let w' = Endpoint.toVertex(p).fields.inBlossom
       switch Node.label(w') {
-      | Free
-      | SingleS
-      | S(_) =>
-        failwith("Label should only be T.")
+      | Free | SingleS | S(_) => failwith("Label should only be T.")
       | T(p') =>
         let backChildren = ParityList.Even(
           {node: w', endpoint: Endpoint.reverse(p')},
@@ -808,17 +789,12 @@ module AddBlossom = {
    ")
   let traceForward = (v, frontChildren) =>
     switch Node.label(v) {
-    | Free
-    | SingleS =>
-      DeadEnd(v, frontChildren)
+    | Free | SingleS => DeadEnd(v, frontChildren)
     | T(_) => failwith("Label should only be S.")
     | S(p) =>
       let v' = Endpoint.toVertex(p).fields.inBlossom
       switch Node.label(v') {
-      | Free
-      | SingleS
-      | S(_) =>
-        failwith("Label should only be T.")
+      | Free | SingleS | S(_) => failwith("Label should only be T.")
       | T(p') =>
         let lastV = Endpoint.toVertex(p').fields.inBlossom
         let frontChildren = ParityList.Odd(
@@ -914,13 +890,8 @@ module AddBlossom = {
 
   let bestEdgesReducerHelper = (~b, ~neighbor as w, ~bestEdgeMap, ~edge) =>
     switch Node.label(w) {
-    | SingleS
-    | S(_) if !Node.eqB(w, b) =>
-      setBestEdgeMap(~w, ~edge, bestEdgeMap)
-    | SingleS
-    | S(_)
-    | Free
-    | T(_) => bestEdgeMap
+    | SingleS | S(_) if !Node.eqB(w, b) => setBestEdgeMap(~w, ~edge, bestEdgeMap)
+    | SingleS | S(_) | Free | T(_) => bestEdgeMap
     }
 
   let rec endpointReducer = (~b, ~bestEdgeMap, x) =>
@@ -1011,9 +982,7 @@ module AddBlossom = {
       /* This T-Vertex now turns into an S-vertex because it becomes part
        of an S-blossom; add it to the queue. */
       | T(_) => list{v, ...queue}
-      | Free
-      | SingleS
-      | S(_) => queue
+      | Free | SingleS | S(_) => queue
       }
     })
     graph.blossoms = list{b, ...graph.blossoms}
@@ -1095,9 +1064,7 @@ module ModifyBlossom = {
     | Some(parent) => bubbleBlossomTree(Blossom(parent), b, parent.parent)
     }
 
-  type direction =
-    | Backward
-    | Forward
+  type direction = Backward | Forward
 
   @ocaml.doc("
    Swap matched/unmatched edges over an alternating path through a blossom
@@ -1272,10 +1239,8 @@ module ModifyBlossom = {
         Node.label(child.node) {
         /* This sub-blossom just got its label S through one of its neighbors;
          leave it. */
-        | SingleS
-        | S(_) => queue
-        | Free
-        | T(_) =>
+        | SingleS | S(_) => queue
+        | Free | T(_) =>
           /* If the sub-blossom contains a reachable vertex, assign label T to
            the sub-blossom. */
           let rec labelReachableVertex = x =>
@@ -1361,12 +1326,8 @@ module Delta = {
         | {parent: None, label: T(_), dualVar, _} =>
           switch deltaType {
           | None => Some(Four(dualVar, b))
-          | Some(
-              One(delta)
-              | Two(delta, _)
-              | Three(delta, _)
-              | Four(delta, _),
-            ) if dualVar < delta =>
+          | Some(One(delta) | Two(delta, _) | Three(delta, _) | Four(delta, _))
+            if dualVar < delta =>
             Some(Four(dualVar, b))
           | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
           }
@@ -1422,12 +1383,7 @@ module Delta = {
           let kslack = Edge.slack(edge)
           switch deltaType {
           | None => Some(Two(kslack, edge))
-          | Some(
-              One(delta)
-              | Two(delta, _)
-              | Three(delta, _)
-              | Four(delta, _),
-            ) if kslack < delta =>
+          | Some(One(delta) | Two(delta, _) | Three(delta, _) | Four(delta, _)) if kslack < delta =>
             Some(Two(kslack, edge))
           | Some(One(_) | Two(_) | Three(_) | Four(_)) as deltaType => deltaType
           }
@@ -1474,16 +1430,11 @@ module Substage = {
     let mates = Mates.set(mates, s, p, ~cmp)
     /* Trace one step back. */
     switch Node.label(s.fields.inBlossom) {
-    | Free
-    | T(_) =>
-      failwith("Required S vertex.")
+    | Free | T(_) => failwith("Required S vertex.")
     | S(endpoint) =>
       let tInBlossom = Endpoint.toVertex(endpoint).fields.inBlossom
       switch Node.label(tInBlossom) {
-      | Free
-      | SingleS
-      | S(_) =>
-        failwith("Required T vertex.")
+      | Free | SingleS | S(_) => failwith("Required T vertex.")
       | T(p) =>
         /* Trace one step back. */
         let s = Endpoint.toVertex(p)
@@ -1542,8 +1493,7 @@ module Substage = {
           /* Edge has zero slack => it is allowable. */
           switch edge.allowable {
           | NotAllowed if kslack <= 0. => edge.allowable = Allowed
-          | Allowed
-          | NotAllowed => ()
+          | Allowed | NotAllowed => ()
           }
           switch edge.allowable {
           | Allowed =>
@@ -1562,8 +1512,7 @@ module Substage = {
             /* (C2) neighbor is an S-vertex (not in the same blossom; follow
                  back-links to discover either an augmenting path or a new
                  blossom. */
-            | SingleS
-            | S(_) =>
+            | SingleS | S(_) =>
               switch AddBlossom.scanForBlossom(edge) {
               /* Found a new blossom; add it to the blossom bookkeeping and
                turn it into an S-blossom. */
@@ -1593,16 +1542,12 @@ module Substage = {
               | Free =>
                 Label.assignTSingleVertex(~v=neighbor, ~p=Endpoint.reverse(endpoint))
                 aux(~queue, neighbors)
-              | SingleS
-              | S(_)
-              | T(_) =>
-                aux(~queue, neighbors)
+              | SingleS | S(_) | T(_) => aux(~queue, neighbors)
               }
             }
           | NotAllowed =>
             switch Node.label(neighbor.fields.inBlossom) {
-            | SingleS
-            | S(_) =>
+            | SingleS | S(_) =>
               /* Keep track of the least-slack non-allowable edge to a different
                S-blossom. */
               switch inBlossom {
@@ -1616,8 +1561,7 @@ module Substage = {
               | Vertex(_) => ()
               }
               aux(~queue, neighbors)
-            | Free
-            | T(_) =>
+            | Free | T(_) =>
               switch neighbor.label {
               | Free =>
                 /* Neighbor is a free vertex (or an unreached vertex inside a
@@ -1630,10 +1574,7 @@ module Substage = {
                 }
 
                 aux(~queue, neighbors)
-              | SingleS
-              | S(_)
-              | T(_) =>
-                aux(~queue, neighbors)
+              | SingleS | S(_) | T(_) => aux(~queue, neighbors)
               }
             }
           }
@@ -1682,10 +1623,7 @@ module Substage = {
         Graph.updateDualVarsByDelta(graph, ~delta)
         let nextVertex = switch Node.label(edge.i.fields.inBlossom) {
         | Free => edge.j
-        | SingleS
-        | S(_)
-        | T(_) =>
-          edge.i
+        | SingleS | S(_) | T(_) => edge.i
         }
         let queue = list{nextVertex, ...queue}
         edge.allowable = Allowed
