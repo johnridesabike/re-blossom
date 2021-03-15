@@ -1,8 +1,8 @@
-# Res-Blossom Changelog
+# ReScript-Blossom Changelog
 
 ## 2.0
 
-- Changed name to res-blossom
+- Changed name to rescript-blossom
 - Converted Reason to ReScript syntax.
 
 ## 1.1.1

@@ -982,7 +982,7 @@ describe("Output tests", () => {
     )
   )
 })
-Skip.describe("Brute force any missed edge cases (slow)", () =>
+describe("Brute force any missed edge cases (slow)", () =>
   test(
     "Generate a large number of random graphs and check that the algorithm " ++ "doesn't crash.",
     () =>

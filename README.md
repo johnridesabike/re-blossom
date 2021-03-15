@@ -1,10 +1,10 @@
-# Res-Blossom 🌺
+# ReScript-Blossom 🌺
 
 ![GitHub package.json version](https://img.shields.io/github/package-json/v/johnridesabike/re-blossom)
 ![Node.js CI](https://github.com/johnridesabike/re-blossom/workflows/Node.js%20CI/badge.svg)
 ![GitHub](https://img.shields.io/github/license/johnridesabike/re-blossom)
 
-Res-Blossom is a [ReScript](https://rescript-lang.org/) implementation of the
+ReScript-Blossom is a [ReScript](https://rescript-lang.org/) implementation of the
 famous [blossom algorithm](https://en.wikipedia.org/wiki/Blossom_algorithm). It
 finds a maximum matching of vertices on general, undirected, weighted graphs.
 
@@ -12,17 +12,17 @@ finds a maximum matching of vertices on general, undirected, weighted graphs.
 
 ## Installation
 
-You can add Res-Blossom to your project by running:
+You can add ReScript-Blossom to your project by running:
 ```sh
-npm install res-blossom
+npm install rescript-blossom
 ```
 
-You will need to edit your project's `bsconfig.json` file and list Res-Blossom in
-the `bs-dependencies`.
+You will need to edit your project's `bsconfig.json` file and list
+ReScript-Blossom in the `bs-dependencies`.
 ```json
 {
   "bs-dependencies": [
-    "res-blossom"
+    "rescript-blossom"
   ]
 }
 ```
@@ -70,7 +70,7 @@ Then open the URL provided and navigate to the `__benchmarks__` directory.
 To turn on debug logging, enable [rescript-logger](https://github.com/MinimaHQ/rescript-logger)
 with the `RES_LOG` environmental variable:
 ```sh
-RES_LOG=res-blossom=* npm run build
+RES_LOG=rescript-blossom=* npm run build
 ```
 
 This code uses many terms and ideas from

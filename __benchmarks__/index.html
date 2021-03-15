@@ -24,10 +24,10 @@
   SOFTWARE.
 -->
 <head>
-    <title>Res-Blossom benchmarks</title>
+    <title>ReScript-Blossom benchmarks</title>
 </head>
 <body>
-<h1>Res-Blossom benchmarks</h1>
+<h1>ReScript-Blossom benchmarks</h1>
 <h2>Full benchmark suite</h2>
 <ul>
     <li>Step 1: Open your browser's web console.</li>
@@ -47,17 +47,17 @@
 <script src="../node_modules/edmonds-blossom/app/blossom.js"></script>
 <script type=module>
     var jsBlossom = module.exports;
-    import runBenchmark from "../lib/es6_global/__benchmarks__/Benchmarks.bs.js";
+    import runBenchmark from "../lib/es6_global/__benchmarks__/Benchmarks.js";
 
     function benchmark(event) {
         event.preventDefault();
-        var suite = Benchmark.Suite("Res-Blossom vs JS Blossom");
+        var suite = Benchmark.Suite("ReScript-Blossom vs JS Blossom");
         runBenchmark(suite, jsBlossom);
     }
 
     document.querySelector("#benchmark").onclick = benchmark;
 
-    import basicTest from "../lib/es6_global/__benchmarks__/BenchData.bs.js";
+    import basicTest from "../lib/es6_global/__benchmarks__/BenchData.js";
 
     function clicky(event) {
         event.preventDefault();

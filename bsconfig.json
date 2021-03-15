@@ -1,7 +1,6 @@
 {
-  "name": "res-blossom",
+  "name": "rescript-blossom",
   "namespace": "Blossom",
-  "version": "1.1.1",
   "sources": [
     {
       "dir": "src",
@@ -26,13 +25,12 @@
       "in-source": false
     }
   ],
-  "suffix": ".bs.js",
+  "suffix": ".js",
   "bs-dependencies": ["rescript-logger"],
   "bs-dev-dependencies": ["@glennsl/bs-jest"],
-  "ppx-flags": [["rescript-logger/ppx", "--lib=res-blossom"]],
+  "ppx-flags": [["rescript-logger/ppx", "--lib=rescript-blossom"]],
   "warnings": {
     "number": "+A-48",
     "error": "+A-3-44-102"
-  },
-  "refmt": 3
+  }
 }

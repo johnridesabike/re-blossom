@@ -22,7 +22,7 @@
   SOFTWARE.
  */
 @@text("
-{b Res-Blossom} is a {{: https://rescript-lang.org/} ReScript} implementation of
+{b ReScript-Blossom} is a {{: https://rescript-lang.org/} ReScript} implementation of
 the famous {{: https://en.wikipedia.org/wiki/Blossom_algorithm} blossom algorithm}.
 It finds a maximum matching of vertices on general, undirected, weighted graphs.
 
@@ -32,18 +32,18 @@ It finds a maximum matching of vertices on general, undirected, weighted graphs.
 @@text("
 {1 Installation}
 
-You can add Res-Blossom to your project by running:
+You can add ReScript-Blossom to your project by running:
 {[
-  npm install res-blossom
+  npm install rescript-blossom
 ]}
 
-You will need to edit your project's [bsconfig.json] file and list Res-Blossom
-in the [bs-dependencies].
+You will need to edit your project's [bsconfig.json] file and list
+ReScript-Blossom in the [bs-dependencies].
 
 {[
 {
   \"bs-dependencies\": [
-    \"res-blossom\"
+    \"rescript-blossom\"
   ]
 }
 ]}

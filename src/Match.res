@@ -62,9 +62,7 @@ module ParityList = {
    It's used to store each blossom's children. Whether a child is odd or even
    is significant.
    ")
-  type rec even<'a> =
-    | Empty
-    | Even('a, odd<'a>)
+  type rec even<'a> = Empty | Even('a, odd<'a>)
   and odd<'a> = Odd('a, even<'a>)
 
   module Even = {
@@ -356,7 +354,7 @@ module Node = {
   let rec baseVertex = x =>
     switch x {
     | Vertex(vertex) => vertex
-    | Blossom({fields: {children: ParityList.Odd({node, _}, _), _}, _}) => baseVertex(node)
+    | Blossom({fields: {children: Odd({node, _}, _), _}, _}) => baseVertex(node)
     }
 
   let eq = (a, b) =>
@@ -1250,9 +1248,7 @@ module ModifyBlossom = {
               switch v.label {
               | Free => labelReachableVertex(rest)
               | T(p) => Label.assignT(~v, ~p, ~mates, ~queue, ~cmp)
-              | SingleS
-              | S(_) =>
-                failwith("Must be labeled Free or T.")
+              | SingleS | S(_) => failwith("Must be labeled Free or T.")
               }
             }
           Node.Leaves.toList(child.node, ~init=list{})->labelReachableVertex
@@ -1516,7 +1512,7 @@ module Substage = {
               switch AddBlossom.scanForBlossom(edge) {
               /* Found a new blossom; add it to the blossom bookkeeping and
                turn it into an S-blossom. */
-              | AddBlossom.NewBlossom(children) =>
+              | NewBlossom(children) =>
                 let ParityList.Odd({node: _debug_node, _}, _) = children
                 %log.debug(
                   "addBlossom"
@@ -1532,7 +1528,7 @@ module Substage = {
                 aux(~queue, neighbors)
               /* Found an augmenting path; augment the matching and end this
                stage. */
-              | AddBlossom.AugmentingPath => augmentMatching(edge, mates, ~cmp)
+              | AugmentingPath => augmentMatching(edge, mates, ~cmp)
               }
             | T(_) =>
               switch neighbor.label {
@@ -1615,11 +1611,11 @@ module Substage = {
       )
       switch delta {
       /* No further improvement possible; optimum reached. */
-      | Delta.One(delta) =>
+      | One(delta) =>
         Graph.updateDualVarsByDelta(graph, ~delta)
         NotAugmented(queue, mates)
       /* Use the least-slack edge to continue the search. */
-      | Delta.Two(delta, edge) =>
+      | Two(delta, edge) =>
         Graph.updateDualVarsByDelta(graph, ~delta)
         let nextVertex = switch Node.label(edge.i.fields.inBlossom) {
         | Free => edge.j
@@ -1629,13 +1625,13 @@ module Substage = {
         edge.allowable = Allowed
         substage(graph, queue, mates, cardinality)
       /* Use the least-slack edge to continue the search. */
-      | Delta.Three(delta, edge) =>
+      | Three(delta, edge) =>
         Graph.updateDualVarsByDelta(graph, ~delta)
         let queue = list{edge.i, ...queue}
         edge.allowable = Allowed
         substage(graph, queue, mates, cardinality)
       /* Expand the least-z blossom. */
-      | Delta.Four(delta, b) =>
+      | Four(delta, b) =>
         Graph.updateDualVarsByDelta(graph, ~delta)
         let queue = ModifyBlossom.expand(~graph, ~b, ~stage=NotEndstage, ~queue, ~mates)
         substage(graph, queue, mates, cardinality)
@@ -1728,10 +1724,10 @@ let make = (~cardinality=#NotMax, edges, ~id) => {
        path and uses that to improve the matching. */
       let queue = resetStage(~graph, ~mates)
       switch Substage.make(graph, queue, mates, cardinality) {
-      | Substage.NotAugmented(_, mates) =>
+      | NotAugmented(_, mates) =>
         /* No further improvement is possible. */
         Belt.Map.packIdData(~id=comparableToBelt(id), ~data=mates)
-      | Substage.Augmented(mates) =>
+      | Augmented(mates) =>
         /* End of a stage; expand all S-blossoms which have `dualVar` = 0. */
         expandAllSBlossoms(~graph, ~mates, ~queue)
         aux(mates, succ(stageNum))
