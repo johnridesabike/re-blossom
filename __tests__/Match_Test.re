@@ -24,90 +24,95 @@
 open Jest;
 open Expect;
 
+module IntMatch =
+  Match.Make({
+    type t = int;
+    let compare = (a: int, b: int) => compare(a, b);
+  });
+
+module StringMatch = Match.Make(String);
+
 let sortResult = (l, ~compare) =>
   Belt.List.sortU(l, (. (a, _), (b, _)) => compare(a, b));
 
-let sortResultU = (l, ~compare) =>
-  Belt.List.sortU(l, (. (a, _), (b, _)) => compare(. a, b));
-
 describe("Trivial cases", () => {
   test("Empty input graph", () =>
-    Match.Int.make([]) |> Match.toList |> expect |> toEqual([])
+    IntMatch.make([]) |> IntMatch.toList |> expect |> toEqual([])
   );
   test("Single edge", () =>
-    Match.Int.make([(0, 1, 1.)])
-    |> Match.toList
+    IntMatch.make([(0, 1, 1.)])
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(0, 1), (1, 0)])
   );
   test("Two edges", () =>
-    Match.Int.make([(1, 2, 10.), (2, 3, 11.)])
-    |> Match.toList
+    IntMatch.make([(1, 2, 10.), (2, 3, 11.)])
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
   );
   test("Three edges", () =>
-    Match.Int.make([(1, 2, 5.), (2, 3, 11.), (3, 4, 5.)])
-    |> Match.toList
+    IntMatch.make([(1, 2, 5.), (2, 3, 11.), (3, 4, 5.)])
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
   );
   test("Three edges again, with IDs ordered differently", () =>
-    Match.Int.make([(1, 2, 5.), (2, 3, 11.), (4, 3, 5.)])
-    |> Match.toList
+    IntMatch.make([(1, 2, 5.), (2, 3, 11.), (4, 3, 5.)])
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
   );
   test("A simple love triangle", () =>
-    Match.Int.make([(0, 1, 6.), (0, 2, 10.), (1, 2, 5.)])
-    |> Match.toList
+    IntMatch.make([(0, 1, 6.), (0, 2, 10.), (1, 2, 5.)])
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(0, 2), (2, 0)])
   );
   test("Maximum cardinality", () =>
-    Match.Int.make(
+    IntMatch.make(
       [(1, 2, 5.), (2, 3, 11.), (3, 4, 5.)],
       ~cardinality=`Max,
     )
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 2), (2, 1), (3, 4), (4, 3)])
   );
   test("Floating point weights", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, Js.Math._PI),
       (2, 3, Js.Math.exp(1.)),
       (1, 3, 3.0),
       (1, 4, Js.Math.sqrt(2.0)),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 4), (2, 3), (3, 2), (4, 1)])
   );
   describe("Negative weights", () => {
     test("Negative weights", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 2.),
         (1, 3, (-2.)),
         (2, 3, 1.),
         (2, 4, (-1.)),
         (3, 4, (-6.)),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 2), (2, 1)])
     );
 
     test("Negative weights with maximum cardinality", () =>
-      Match.Int.make(
+      IntMatch.make(
         ~cardinality=`Max,
         [
           (1, 2, 2.),
@@ -117,7 +122,7 @@ describe("Trivial cases", () => {
           (3, 4, (-6.)),
         ],
       )
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 3), (2, 4), (3, 1), (4, 2)])
@@ -127,14 +132,14 @@ describe("Trivial cases", () => {
 describe("Blossoms", () => {
   describe("create S-blossom and use it for augmentation.", () => {
     test("S-blossom A", () =>
-      Match.Int.make([(1, 2, 8.), (1, 3, 9.), (2, 3, 10.), (3, 4, 7.)])
-      |> Match.toList
+      IntMatch.make([(1, 2, 8.), (1, 3, 9.), (2, 3, 10.), (3, 4, 7.)])
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 2), (2, 1), (3, 4), (4, 3)])
     );
     test("S-blossom B", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 8.),
         (1, 3, 9.),
         (2, 3, 10.),
@@ -142,7 +147,7 @@ describe("Blossoms", () => {
         (1, 6, 5.),
         (4, 5, 6.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 6), (2, 3), (3, 2), (4, 5), (5, 4), (6, 1)])
@@ -150,7 +155,7 @@ describe("Blossoms", () => {
   });
   describe("Create S-blossom, relabel as T-blossom, use for augmentation.", () => {
     test("S-blossom, relabel as T-blossom: A", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 9.),
         (1, 3, 8.),
         (2, 3, 10.),
@@ -158,13 +163,13 @@ describe("Blossoms", () => {
         (4, 5, 4.),
         (1, 6, 3.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 6), (2, 3), (3, 2), (4, 5), (5, 4), (6, 1)])
     );
     test("S-blossom, relabel as T-blossom: B", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 9.),
         (1, 3, 8.),
         (2, 3, 10.),
@@ -172,13 +177,13 @@ describe("Blossoms", () => {
         (4, 5, 3.),
         (1, 6, 4.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 6), (2, 3), (3, 2), (4, 5), (5, 4), (6, 1)])
     );
     test("S-blossom, relabel as T-blossom: C", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 9.),
         (1, 3, 8.),
         (2, 3, 10.),
@@ -186,14 +191,14 @@ describe("Blossoms", () => {
         (4, 5, 3.),
         (3, 6, 4.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 2), (2, 1), (3, 6), (4, 5), (5, 4), (6, 3)])
     );
   });
   test("Create nested S-blossom, use for augmentation.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 9.),
       (1, 3, 9.),
       (2, 3, 10.),
@@ -202,13 +207,13 @@ describe("Blossoms", () => {
       (4, 5, 10.),
       (5, 6, 6.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 3), (2, 4), (3, 1), (4, 2), (5, 6), (6, 5)])
   );
   test("Create S-blossom, relabel as S, include in nested S-blossom.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 10.),
       (1, 7, 10.),
       (2, 3, 12.),
@@ -219,7 +224,7 @@ describe("Blossoms", () => {
       (6, 7, 10.),
       (7, 8, 8.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -234,7 +239,7 @@ describe("Blossoms", () => {
        ])
   );
   test("Create nested S-blossom, augment, expand recursively.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 8.),
       (1, 3, 8.),
       (2, 3, 10.),
@@ -246,7 +251,7 @@ describe("Blossoms", () => {
       (6, 7, 14.),
       (7, 8, 12.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -261,7 +266,7 @@ describe("Blossoms", () => {
        ])
   );
   test("Create S-blossom, relabel as T, expand.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 23.),
       (1, 5, 22.),
       (1, 6, 15.),
@@ -271,7 +276,7 @@ describe("Blossoms", () => {
       (4, 8, 14.),
       (5, 7, 13.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -286,7 +291,7 @@ describe("Blossoms", () => {
        ])
   );
   test("Create nested S-blossom, relabel as T, expand.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 19.),
       (1, 3, 20.),
       (1, 8, 8.),
@@ -297,7 +302,7 @@ describe("Blossoms", () => {
       (4, 7, 7.),
       (5, 6, 7.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -315,7 +320,7 @@ describe("Blossoms", () => {
 describe("Nasty cases", () => {
   test(
     "Create blossom, relabel as T in more than one way, expand, augment.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 45.),
       (1, 5, 45.),
       (2, 3, 50.),
@@ -327,7 +332,7 @@ describe("Nasty cases", () => {
       (5, 7, 26.),
       (9, 10, 5.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -344,7 +349,7 @@ describe("Nasty cases", () => {
        ])
   );
   test("Again, but slightly different.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 45.),
       (1, 5, 45.),
       (2, 3, 50.),
@@ -356,7 +361,7 @@ describe("Nasty cases", () => {
       (5, 7, 40.),
       (9, 10, 5.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -376,7 +381,7 @@ describe("Nasty cases", () => {
     "Create blossom, relabel as T, expand such that a new least-slack "
     ++ "S-to-free edge is produced, augment.",
     () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 45.),
       (1, 5, 45.),
       (2, 3, 50.),
@@ -388,7 +393,7 @@ describe("Nasty cases", () => {
       (5, 7, 26.),
       (9, 10, 5.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -408,7 +413,7 @@ describe("Nasty cases", () => {
     "Create nested blossom, relabel as T in more than one way, expand outer "
     ++ "blossom such that inner blossom ends up on an augmenting path.",
     () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 45.),
       (1, 7, 45.),
       (2, 3, 50.),
@@ -423,7 +428,7 @@ describe("Nasty cases", () => {
       (7, 10, 26.),
       (11, 12, 5.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -443,7 +448,7 @@ describe("Nasty cases", () => {
   );
   describe("Create nested S-blossom, relabel as S, expand recursively.", () => {
     test("Create nested S-blossom, relabel as S, expand recursively.", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 40.),
         (1, 3, 40.),
         (2, 3, 60.),
@@ -456,7 +461,7 @@ describe("Nasty cases", () => {
         (8, 10, 10.),
         (4, 9, 30.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -473,7 +478,7 @@ describe("Nasty cases", () => {
          ])
     );
     test("Again, but slightly different. (A)", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 40.),
         (1, 3, 40.),
         (2, 3, 60.),
@@ -487,7 +492,7 @@ describe("Nasty cases", () => {
         (4, 9, 30.),
         (11, 10, 100.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -504,7 +509,7 @@ describe("Nasty cases", () => {
          ])
     );
     test("Again, but slightly different. (B)", () =>
-      Match.Int.make([
+      IntMatch.make([
         (1, 2, 40.),
         (1, 3, 40.),
         (2, 3, 60.),
@@ -518,7 +523,7 @@ describe("Nasty cases", () => {
         (4, 9, 30.),
         (3, 6, 36.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -538,7 +543,7 @@ describe("Nasty cases", () => {
 });
 describe("More nasty cases", () => {
   test("Blossom with five children (A).", () =>
-    Match.Int.make([
+    IntMatch.make([
       (9, 8, 30.),
       (9, 5, 55.),
       (9, 3, 6.),
@@ -554,7 +559,7 @@ describe("More nasty cases", () => {
       (2, 1, 55.),
       (1, 0, 43.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -571,7 +576,7 @@ describe("More nasty cases", () => {
        ])
   );
   test("Blossom with five children (B).", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 77.),
       (1, 3, 60.),
       (1, 4, 61.),
@@ -587,7 +592,7 @@ describe("More nasty cases", () => {
       (5, 4, 55.),
       (4, 10, 30.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -602,7 +607,7 @@ describe("More nasty cases", () => {
        ])
   );
   test("Scan along a long label path to create a blossom.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (10, 6, 30.),
       (10, 9, 55.),
       (10, 8, 50.),
@@ -616,7 +621,7 @@ describe("More nasty cases", () => {
       (2, 8, 55.),
       (8, 7, 30.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -635,7 +640,7 @@ describe("More nasty cases", () => {
 });
 describe("Input tests", () => {
   test("Duplicate edges are ignored.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 8.),
       (1, 3, 9.),
       (2, 3, 10.),
@@ -644,13 +649,13 @@ describe("Input tests", () => {
       (3, 1, 9000.),
       (3, 4, 7.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 2), (2, 1), (3, 4), (4, 3)])
   );
   test("Non-sequential and negative integers.", () =>
-    Match.Int.make([
+    IntMatch.make([
       (69, (-69), 40.),
       (69, 420, 40.),
       ((-69), 420, 60.),
@@ -663,7 +668,7 @@ describe("Input tests", () => {
       (8, 10, 10.),
       ((-420), 9, 30.),
     ])
-    |> Match.toList
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -685,7 +690,7 @@ describe("Input tests", () => {
       ++ "expand outer blossom such that inner blossom ends up on an "
       ++ "augmenting path.",
       () =>
-      Match.Int.make([
+      IntMatch.make([
         ((-1), (-2), 45.),
         ((-1), (-7), 45.),
         ((-2), (-3), 50.),
@@ -700,7 +705,7 @@ describe("Input tests", () => {
         ((-7), (-10), 26.),
         ((-11), (-12), 5.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -720,7 +725,7 @@ describe("Input tests", () => {
     );
     test(
       "(Reversed) Create nested S-blossom, augment, expand recursively.", () =>
-      Match.Int.make([
+      IntMatch.make([
         (8, 7, 8.),
         (8, 6, 8.),
         (7, 6, 10.),
@@ -732,7 +737,7 @@ describe("Input tests", () => {
         (3, 2, 14.),
         (2, 1, 12.),
       ])
-      |> Match.toList
+      |> IntMatch.toList
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -748,14 +753,14 @@ describe("Input tests", () => {
     );
   });
   test("Vertices with edges on themselves are silently ignored.", () =>
-    Match.Int.make([(0, 1, 1.), (1, 1, 9001.)])
-    |> Match.toList
+    IntMatch.make([(0, 1, 1.), (1, 1, 9001.)])
+    |> IntMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([(0, 1), (1, 0)])
   );
   test("String vertices", () =>
-    Match.String.make([
+    StringMatch.make([
       ("Mary", "Joseph", 40.),
       ("Mary", "Michael", 40.),
       ("Joseph", "Michael", 60.),
@@ -770,7 +775,7 @@ describe("Input tests", () => {
       ("Gabriel", "Gabriel", 100.),
       ("Gabriel", "Andrew", 100.),
     ])
-    |> Match.toList
+    |> StringMatch.toList
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -812,7 +817,7 @@ describe("Input tests", () => {
           | Andrew => 7
           | James => 8
           | Philip => 9;
-        let cmp = (a, b) => compare(toInt(a), toInt(b));
+        let compare = (a, b) => compare(toInt(a), toInt(b));
       };
       /*********************************************************
        *  Andrew ---10--- Philip                  Peter        *
@@ -825,24 +830,22 @@ describe("Input tests", () => {
        *        \      /                  /                    *
        *         Joseph ------ 55 ----- Mark ----30---- James  *
        ********************************************************/
-      Match.make(
-        ~id=(module Match.MakeComparable(Person)),
-        Person.[
-          (Mary, Joseph, 40.),
-          (Mary, Matthew, 40.),
-          (Joseph, Matthew, 60.),
-          (Joseph, Mark, 55.),
-          (Matthew, Luke, 55.),
-          (Mark, Luke, 50.),
-          (Mary, Andrew, 15.),
-          (Luke, Peter, 30.),
-          (Peter, John, 10.),
-          (Andrew, Philip, 10.),
-          (Mark, James, 30.),
-        ],
-      )
-      |> Match.toList
-      |> sortResult(~compare=Person.cmp)
+      module PersonMatch = Match.Make(Person);
+      PersonMatch.make([
+        (Mary, Joseph, 40.),
+        (Mary, Matthew, 40.),
+        (Joseph, Matthew, 60.),
+        (Joseph, Mark, 55.),
+        (Matthew, Luke, 55.),
+        (Mark, Luke, 50.),
+        (Mary, Andrew, 15.),
+        (Luke, Peter, 30.),
+        (Peter, John, 10.),
+        (Andrew, Philip, 10.),
+        (Mark, James, 30.),
+      ])
+      |> PersonMatch.toList
+      |> sortResult(~compare=Person.compare)
       |> expect
       |> toEqual(
            Person.[
@@ -887,24 +890,22 @@ describe("Input tests", () => {
           | Mark => "Mark"
           | Luke => "Luke"
           | John => "John";
-        let cmp = (a, b) => compare(toString(a), toString(b));
+        let compare = (a, b) => compare(toString(a), toString(b));
       };
-      Match.make(
-        ~id=(module Match.MakeComparable(Person)),
-        Person.[
-          (Mary, Joseph, 9.),
-          (Mary, Matthew, 9.),
-          (Joseph, Matthew, 10.),
-          (Joseph, Mark, 8.),
-          (Matthew, Luke, 8.),
-          (Mark, Luke, 10.),
-          (Luke, John, 6.),
-          (Luke, Luke, 100.),
-          (Luke, John, 100.),
-        ],
-      )
-      |> Match.toList
-      |> sortResult(~compare=Person.cmp)
+      module PersonMatch = Match.Make(Person);
+      PersonMatch.make([
+        (Mary, Joseph, 9.),
+        (Mary, Matthew, 9.),
+        (Joseph, Matthew, 10.),
+        (Joseph, Mark, 8.),
+        (Matthew, Luke, 8.),
+        (Mark, Luke, 10.),
+        (Luke, John, 6.),
+        (Luke, Luke, 100.),
+        (Luke, John, 100.),
+      ])
+      |> PersonMatch.toList
+      |> sortResult(~compare=Person.compare)
       |> expect
       |> toEqual(
            Person.[
@@ -917,100 +918,12 @@ describe("Input tests", () => {
            ],
          );
     });
-    test("Variants with an uncurried cmp function.", () => {
-      module Person = {
-        type t =
-          | Mary
-          | Joseph
-          | Matthew;
-        let toInt =
-          fun
-          | Mary => 0
-          | Joseph => 1
-          | Matthew => 2;
-        let cmp = (. a, b) => compare(toInt(a), toInt(b));
-      };
-      Match.make(
-        ~id=(module Match.MakeComparableU(Person)),
-        Person.[
-          (Mary, Joseph, 40.),
-          (Mary, Matthew, 30.),
-          (Joseph, Matthew, 20.),
-        ],
-      )
-      |> Match.toList
-      |> sortResultU(~compare=Person.cmp)
-      |> expect
-      |> toEqual(Person.[(Mary, Joseph), (Joseph, Mary)]);
-    });
-    test("Variants and reusing a Belt.Id module.", () => {
-      module Person = {
-        type t =
-          | Mary
-          | Joseph
-          | Matthew;
-        let toInt =
-          fun
-          | Mary => 0
-          | Joseph => 1
-          | Matthew => 2;
-        let cmp = (a, b) => compare(toInt(a), toInt(b));
-      };
-      module PersonCmp = Belt.Id.MakeComparable(Person);
-      Match.make(
-        ~id=
-          Match.unsafeComparableFromBelt(
-            ~id=(module PersonCmp),
-            ~cmp=Person.cmp,
-          ),
-        Person.[
-          (Mary, Joseph, 40.),
-          (Mary, Matthew, 30.),
-          (Joseph, Matthew, 20.),
-        ],
-      )
-      |> Match.toList
-      |> sortResult(~compare=Person.cmp)
-      |> expect
-      |> toEqual(Person.[(Mary, Joseph), (Joseph, Mary)]);
-    });
-    test("Again, with an uncurried cmp function.", () => {
-      module Person = {
-        type t =
-          | Mary
-          | Joseph
-          | Matthew;
-        let toInt =
-          fun
-          | Mary => 0
-          | Joseph => 1
-          | Matthew => 2;
-        let cmp = (. a, b) => compare(toInt(a), toInt(b));
-      };
-      module PersonCmp = Belt.Id.MakeComparableU(Person);
-      Match.make(
-        ~id=
-          Match.unsafeComparableFromBeltU(
-            ~id=(module PersonCmp),
-            ~cmp=Person.cmp,
-          ),
-        Person.[
-          (Mary, Joseph, 40.),
-          (Mary, Matthew, 30.),
-          (Joseph, Matthew, 20.),
-        ],
-      )
-      |> Match.toList
-      |> sortResultU(~compare=Person.cmp)
-      |> expect
-      |> toEqual(Person.[(Mary, Joseph), (Joseph, Mary)]);
-    });
     test("Variant constructors", () => {
       module StringOrInt = {
         type t =
           | String(string)
           | Int(int);
-        let cmp = (a, b) =>
+        let compare = (a, b) =>
           switch (a, b) {
           | (String(a), String(b)) => compare(a, b)
           | (Int(a), Int(b)) => compare(a, b)
@@ -1018,25 +931,22 @@ describe("Input tests", () => {
           | (Int(_), String(_)) => (-1)
           };
       };
-      module Cmp = (val Match.comparable(StringOrInt.cmp));
-      Match.make(
-        ~id=(module Cmp),
-        StringOrInt.[
-          (Int(1), Int(2), 40.),
-          (Int(1), Int(3), 40.),
-          (Int(2), Int(3), 60.),
-          (Int(2), Int(4), 55.),
-          (Int(3), Int(5), 55.),
-          (Int(4), Int(5), 50.),
-          (Int(1), String("c"), 15.),
-          (Int(5), String("b"), 30.),
-          (String("b"), String("a"), 10.),
-          (String("c"), String("e"), 10.),
-          (Int(4), String("d"), 30.),
-        ],
-      )
-      |> Match.toList
-      |> sortResult(~compare=StringOrInt.cmp)
+      module SOIMatch = Match.Make(StringOrInt);
+      SOIMatch.make([
+        (Int(1), Int(2), 40.),
+        (Int(1), Int(3), 40.),
+        (Int(2), Int(3), 60.),
+        (Int(2), Int(4), 55.),
+        (Int(3), Int(5), 55.),
+        (Int(4), Int(5), 50.),
+        (Int(1), String("c"), 15.),
+        (Int(5), String("b"), 30.),
+        (String("b"), String("a"), 10.),
+        (String("c"), String("e"), 10.),
+        (Int(4), String("d"), 30.),
+      ])
+      |> SOIMatch.toList
+      |> sortResult(~compare=StringOrInt.compare)
       |> expect
       |> toEqual(
            StringOrInt.[
@@ -1057,7 +967,7 @@ describe("Input tests", () => {
 });
 describe("Output tests", () => {
   let result =
-    Match.Int.make([
+    IntMatch.make([
       (1, 2, 40.),
       (1, 3, 40.),
       (2, 3, 60.),
@@ -1071,13 +981,13 @@ describe("Output tests", () => {
       (4, 9, 30.),
     ]);
   test("get", () =>
-    Match.get(result, 5) |> expect |> toBe(Some(3))
+    IntMatch.get(result, 5) |> expect |> toBe(Some(3))
   );
   test("get None", () =>
-    Match.get(result, 69) |> expect |> toBe(None)
+    IntMatch.get(result, 69) |> expect |> toBe(None)
   );
   test("toList", () =>
-    Match.toList(result)
+    IntMatch.toList(result)
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -1093,42 +1003,19 @@ describe("Output tests", () => {
          (10, 8),
        ])
   );
-  test("toMap", () =>
-    Belt.Map.eq(
-      Match.toMap(result),
-      Belt.Map.fromArray(
-        ~id=Match.comparableToBelt((module Match.Int.Cmp)),
-        [|
-          (1, 2),
-          (2, 1),
-          (3, 5),
-          (4, 9),
-          (5, 3),
-          (6, 7),
-          (7, 6),
-          (8, 10),
-          (9, 4),
-          (10, 8),
-        |],
-      ),
-      (==),
-    )
-    |> expect
-    |> toBe(true)
-  );
   test("forEach", () => {
     let arr = Array.make(11, -1);
-    Match.forEach(result, ~f=(v1, v2) => ignore(arr[v1] = v2));
+    IntMatch.forEach(result, ~f=(v1, v2) => ignore(arr[v1] = v2));
     expect(arr) |> toEqual([|(-1), 2, 1, 5, 9, 3, 7, 6, 10, 4, 8|]);
   });
   test("isEmpty", () =>
-    Match.isEmpty(result) |> expect |> toBe(false)
+    IntMatch.isEmpty(result) |> expect |> toBe(false)
   );
   test("has", () =>
-    Match.has(result, 5) |> expect |> toBe(true)
+    result |> IntMatch.has(5) |> expect |> toBe(true)
   );
   test("reduce", () =>
-    Match.reduce(result, ~init="", ~f=(acc, v1, v2) =>
+    IntMatch.reduce(result, ~init="", ~f=(acc, v1, v2) =>
       Belt.Int.("(" ++ toString(v1) ++ ", " ++ toString(v2) ++ "), " ++ acc)
     )
     |> expect
@@ -1138,7 +1025,7 @@ describe("Output tests", () => {
        )
   );
 });
-Skip.describe("Brute force any missed edge cases (slow)", () =>
+describe("Brute force any missed edge cases (slow)", () =>
   test(
     "Generate a large number of random graphs and check that the algorithm "
     ++ "doesn't crash.",
@@ -1149,7 +1036,7 @@ Skip.describe("Brute force any missed edge cases (slow)", () =>
           Belt.List.makeBy(63, _ =>
             Js.Math.(random_int(0, 15), random_int(0, 15), random() *. 100.)
           )
-          |> Match.Int.make
+          |> IntMatch.make
           |> ignore
         );
     }

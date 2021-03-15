@@ -28,7 +28,8 @@ the famous {{: https://en.wikipedia.org/wiki/Blossom_algorithm} blossom algorith
 It finds a maximum matching of vertices on general, undirected, weighted graphs.
 
 {{: https://github.com/johnridesabike/re-blossom} Browse the source.}
-|}];
+|}
+];
 
 [@text
   {|
@@ -272,44 +273,27 @@ efficient JavaScript. In the future, it may support other platforms as well.
 |}
 ];
 
-module Internal: {
-  type cmp('vertex, 'identity);
-  type edgeCmp('v, 'identity, 'vertexIdentity);
-};
-
-module type Comparable = {
-  type t;
-  type identity;
-  type edgeIdentity;
-  let cmp: Internal.cmp(t, identity);
-  let edgeCmp: Internal.edgeCmp(t, edgeIdentity, identity);
-  module BeltCmp:
-    Belt.Id.Comparable with type t = t and type identity = identity;
-};
-
-/**
-  A module of functions with a unique identity type. It is analogous to the
-  type [Belt.Id.comparable]. Create one with the {!val:comparable} function or the
-  {!MakeComparable} functor. Or create one with an existing [Belt.Id.comparable]
-  module with {!unsafeComparableFromBelt}.
- */
-type comparable('vertex, 'id) = (module Comparable with
-                                    type identity = 'id and type t = 'vertex);
-
 /**
   Represents whether or not the algorithm should {i only} accept
   maximum-cardinality solutions.
  */
 type cardinality = [ | `Max | `NotMax];
 
-/**
+module type OrderedType = {
+  type t;
+  let compare: (t, t) => int;
+};
+
+module type S = {
+  type vertex;
+  /**
   A bi-directional, read-only mapping of each vertex to its mate vertex.
  */
-type t('vertex, 'id);
+  type t;
 
-[@text {|{2 Functions}|}];
+  [@text {|{2 Functions}|}];
 
-/**
+  /**
   Computes a maximum-weighted matching on a general undirected weighted graph.
   This function takes time O(n³). See {!section:usage} for examples of its use.
 
@@ -327,22 +311,17 @@ type t('vertex, 'id);
   @param id A first-class module created by {!val:comparable} or
   {!MakeComparable}.
  */
-let make:
-  (
-    ~cardinality: cardinality=?,
-    list(('vertex, 'vertex, float)),
-    ~id: comparable('vertex, 'id)
-  ) =>
-  t('vertex, 'id);
+  let make:
+    (~cardinality: cardinality=?, list((vertex, vertex, float))) => t;
 
-/**
+  /**
   Returns [Some(mate)] for a mated vertex, or [None] if none exists.
 
   {[Blossom.Match.get(result, "Mary") == Some("Joseph");]}
  */
-let get: (t('vertex, 'id), 'vertex) => option('vertex);
+  let get: (t, vertex) => option(vertex);
 
-/**
+  /**
   Reduces over the pairs of vertex mates. Each pair is used twice, once in each
   order.
 
@@ -351,54 +330,17 @@ let get: (t('vertex, 'id), 'vertex) => option('vertex);
       Blossom.Match.reduce(result, ~init=[], ~f=(acc, v1, v2) => [(v1, v2), ...acc]);
   ]}
  */
-let reduce:
-  (t('vertex, 'id), ~init: 'acc, ~f: ('acc, 'vertex, 'vertex) => 'acc) => 'acc;
+  let reduce: (t, ~init: 'acc, ~f: ('acc, vertex, vertex) => 'acc) => 'acc;
 
-/**
-  Reduces over the pairs of vertex mates. Each pair is used twice, once in each
-  order.
-
-  Takes an uncurried [f] function.
-
-  {[
-  let list =
-    Blossom.Match.reduce(result, ~init=[], ~f=(. acc, v1, v2) => [(v1, v2), ...acc]);
-  ]}
- */
-let reduceU:
-  (t('vertex, 'id), ~init: 'acc, ~f: (. 'acc, 'vertex, 'vertex) => 'acc) =>
-  'acc;
-
-/**
+  /**
   Iterates over the pairs of vertex mates. Each pair is used twice, once in
   each order.
 
   {[Blossom.Match.forEach(result, ~f=(v1, v2) => Js.log2(v1, v2));]}
  */
-let forEach: (t('vertex, 'id), ~f: ('vertex, 'vertex) => unit) => unit;
+  let forEach: (t, ~f: (vertex, vertex) => unit) => unit;
 
-/**
-  Iterates over the pairs of vertex mates. Each pair is used twice, once in
-  order.
-
-  Takes an uncurried [f] function.
-
-
-  {[Blossom.Match.forEach(result, ~f=(. v1, v2) => Js.log2(v1, v2));]}
- */
-let forEachU: (t('vertex, 'id), ~f: (. 'vertex, 'vertex) => unit) => unit;
-
-/**
-  Returns a [Belt.Map.t] where each key is a vertex and each value is its mate.
-
-  {[
-  let map = Blossom.Match.toMap(result);
-  Belt.Map.get(map, "Mary") == Some("Joseph");
-  ]}
- */
-let toMap: t('vertex, 'id) => Belt.Map.t('vertex, 'vertex, 'id);
-
-/**
+  /**
   Returns a list of tuples for each pair of vertex mates. Each pair is used
   twice, once in each order.
 
@@ -417,120 +359,24 @@ let toMap: t('vertex, 'id) => Belt.Map.t('vertex, 'vertex, 'id);
     ];
   ]}
  */
-let toList: t('vertex, 'id) => list(('vertex, 'vertex));
+  let toList: t => list((vertex, vertex));
 
-/**
+  /**
   Returns [true] if there are no mates, [false] otherwise.
 
   {[Blossom.Match.isEmpty(result) == false;]}
  */
-let isEmpty: t('vertex, 'id) => bool;
+  let isEmpty: t => bool;
 
-/**
+  /**
   Returns [true] if the vertex has a mate, [false] otherwise.
 
   {[Blossom.Match.has(result, "Mary") == true;]}
  */
-let has: (t('vertex, 'id), 'vertex) => bool;
-
-[@text {|{2 Prepackaged modules}|}];
-
-/**
-  Prepackaged module for building graphs with [int] vertices.
- */
-module Int: {
-  module Cmp: Comparable with type t = int;
-  type nonrec t = t(int, Cmp.identity);
-  let make: (~cardinality: cardinality=?, list((int, int, float))) => t;
+  let has: (vertex, t) => bool;
 };
 
-/**
-  Prepackaged module for building graphs with [string] vertices.
- */
-module String: {
-  module Cmp: Comparable with type t = string;
-  type nonrec t = t(string, Cmp.identity);
-  let make:
-    (~cardinality: cardinality=?, list((string, string, float))) => t;
-};
-
-[@text {|{2 Creating comparables}|}];
-
-/**
-  Turns a [Belt.Id.comparable] module into {!type:comparable}.
-  
-  This is unsafe because the compiler can't guarantee the [cmp] value will be
-  correct.
-
-  {[
-  module MyTypeCmp = Belt.Id.MakeComparable(MyType);
-  let blossomCmp =
-    Blossom.Match.unsafeComparableFromBelt(
-      ~id=(module MyTypeCmp),
-      ~cmp=MyType.cmp
-    );
-  ]}
- */
-let unsafeComparableFromBelt:
-  (~id: Belt.Id.comparable('vertex, 'id), ~cmp: ('vertex, 'vertex) => int) =>
-  comparable('vertex, 'id);
-
-/**
-  Turns a [Belt.Id.comparable] module into a {!type:comparable} with an
-  uncurried [cmp] function.
-  
-  This is unsafe because the compiler can't guarantee the [cmp] value will be
-  correct.
- */
-let unsafeComparableFromBeltU:
-  (
-    ~id: Belt.Id.comparable('vertex, 'id),
-    ~cmp: (. 'vertex, 'vertex) => int
-  ) =>
-  comparable('vertex, 'id);
-
-/**
-  Creates a {!type:comparable}.
-  {[
-  module IntCmp = Blossom.Match.MakeComparable({
-    type t = int;
-    let cmp: (t, t) => int = compare;
-  });
-  ]}
- */
-module MakeComparable:
-  (M: {
-     type t;
-     let cmp: (t, t) => int;
-   }) => Comparable with type t = M.t;
-
-/**
-  Creates a {!type:comparable} with an uncurried [cmp] function.
- */
-module MakeComparableU:
-  (M: {
-     type t;
-     let cmp: (. t, t) => int;
-   }) => Comparable with type t = M.t;
-
-/**
-  Creates a {!type:comparable}.
-  {[module IntCmp = (val Match.comparable(compare: (int, int) => int));]}
- */
-let comparable:
-  (('vertex, 'vertex) => int) => (module Comparable with type t = 'vertex);
-
-/**
-  Creates a {!type:comparable} with an uncurried [cmp] function.
- */
-let comparableU:
-  ((. 'vertex, 'vertex) => int) => (module Comparable with type t = 'vertex);
-
-/**
- Turns a {!type:comparable} into a [Belt.Id.comparable].
- */
-let comparableToBelt:
-  comparable('vertex, 'id) => Belt.Id.comparable('vertex, 'id);
+module Make: (Ord: OrderedType) => S with type vertex = Ord.t;
 
 [@text
   {|

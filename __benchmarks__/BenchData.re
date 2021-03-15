@@ -21,6 +21,11 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
  ******************************************************************************/
+module IntMatch =
+  Match.Make({
+    type t = int;
+    let compare = (a: int, b: int) => compare(a, b);
+  });
 module Int = {
   let large = [
     (0, 1, 37.333333333333336),
@@ -322,71 +327,71 @@ module String =
   });
 
 /*
-module PersonType = {
-  type t =
-    | Mary
-    | Joseph
-    | Michael
-    | Gabriel
-    | Raphael
-    | John
-    | Peter
-    | Paul
-    | Andrew
-    | James
-    | Thomas
-    | Philip
-    | Bartholomew
-    | Matthew
-    | Simon
-    | Jude
-    | Matthias
-    | Barnabas;
-  let ofInt =
-    fun
-    | 0 => Mary
-    | 1 => Joseph
-    | 2 => Michael
-    | 3 => Gabriel
-    | 4 => Raphael
-    | 5 => John
-    | 6 => Peter
-    | 7 => Paul
-    | 8 => Andrew
-    | 9 => James
-    | 10 => Thomas
-    | 11 => Philip
-    | 12 => Bartholomew
-    | 13 => Matthew
-    | 14 => Simon
-    | 15 => Jude
-    | 16 => Matthias
-    | _ => Barnabas;
-  let toInt =
-    fun
-    | Mary => 0
-    | Joseph => 1
-    | Michael => 2
-    | Gabriel => 3
-    | Raphael => 4
-    | John => 5
-    | Peter => 6
-    | Paul => 7
-    | Andrew => 8
-    | James => 9
-    | Thomas => 10
-    | Philip => 11
-    | Bartholomew => 12
-    | Matthew => 13
-    | Simon => 14
-    | Jude => 15
-    | Matthias => 16
-    | Barnabas => 17;
-  let cmp = (a, b) => compare(toInt(a), toInt(b));
-};
+ module PersonType = {
+   type t =
+     | Mary
+     | Joseph
+     | Michael
+     | Gabriel
+     | Raphael
+     | John
+     | Peter
+     | Paul
+     | Andrew
+     | James
+     | Thomas
+     | Philip
+     | Bartholomew
+     | Matthew
+     | Simon
+     | Jude
+     | Matthias
+     | Barnabas;
+   let ofInt =
+     fun
+     | 0 => Mary
+     | 1 => Joseph
+     | 2 => Michael
+     | 3 => Gabriel
+     | 4 => Raphael
+     | 5 => John
+     | 6 => Peter
+     | 7 => Paul
+     | 8 => Andrew
+     | 9 => James
+     | 10 => Thomas
+     | 11 => Philip
+     | 12 => Bartholomew
+     | 13 => Matthew
+     | 14 => Simon
+     | 15 => Jude
+     | 16 => Matthias
+     | _ => Barnabas;
+   let toInt =
+     fun
+     | Mary => 0
+     | Joseph => 1
+     | Michael => 2
+     | Gabriel => 3
+     | Raphael => 4
+     | John => 5
+     | Peter => 6
+     | Paul => 7
+     | Andrew => 8
+     | James => 9
+     | Thomas => 10
+     | Philip => 11
+     | Bartholomew => 12
+     | Matthew => 13
+     | Simon => 14
+     | Jude => 15
+     | Matthias => 16
+     | Barnabas => 17;
+   let cmp = (a, b) => compare(toInt(a), toInt(b));
+ };
 
-module Person = Make(PersonType);
-*/
+ module Person = Make(PersonType);
+ */
 
 let default = () =>
-  Belt.List.forEachU(Int.data, (. data) => Match.Int.make(data));
+  Belt.List.forEachU(Int.data, (. data) => IntMatch.make(data));

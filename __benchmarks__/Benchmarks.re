@@ -22,6 +22,13 @@
   SOFTWARE.
  ******************************************************************************/
 open Belt;
+module IntMatch =
+  Match.Make({
+    type t = int;
+    let compare = (a: int, b: int) => compare(a, b);
+  });
+
+module StringMatch = Match.Make(String);
 
 module JsBlossom = {
   type t = (. array((int, int, float))) => array(int);
@@ -119,7 +126,7 @@ let make = (suite, jsBlossom) => {
   BenchmarkJs.(
     suite
     ->add("Re-Blossom: Integers", () =>
-        List.forEachU(BenchData.Int.data, (. x) => Match.Int.make(x))
+        List.forEachU(BenchData.Int.data, (. x) => IntMatch.make(x))
       )
     ->add("JS Blossom: Integers", () =>
         List.forEachU(BenchData.Int.data, (. x) =>
@@ -127,7 +134,7 @@ let make = (suite, jsBlossom) => {
         )
       )
     ->add("Re-Blossom: Strings ", () =>
-        List.forEachU(BenchData.String.data, (. x) => Match.String.make(x))
+        List.forEachU(BenchData.String.data, (. x) => StringMatch.make(x))
       )
     ->add("JS Blossom: Strings ", () => {
         List.forEachU(
