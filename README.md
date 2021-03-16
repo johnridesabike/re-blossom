@@ -11,6 +11,21 @@ finds a maximum matching of vertices on general, undirected, weighted graphs.
 
 **[📖 Read the documentation](https://johnridesa.bike/re-blossom/)**
 
+## Notice
+
+If you're using [ReScript](https://rescript-lang.org), check out
+[ReScript-Blossom](https://github.com/johnridesabike/rescript-blossom). It's
+the same algorithm, but optimized for a JavaScript environment.
+
+This package originally had similar optimizations, but I've reworked it to be
+more compatible with native-Reason. This package currently still relies on
+`bs-platform` to compile to JavaScript, but that's only for the debugging and
+testing code. All of the core code should be native-compatible.
+
+I'm not currently using this package in a native environment, so I haven't
+fully converted it yet. If you think you will find this useful, I encourage
+you to fork it and make the modifications you need.
+
 ## Installation
 
 Re-Blossom requires [BuckleScript](https://bucklescript.github.io/) as a peer
@@ -42,10 +57,6 @@ git clone https://github.com/johnridesabike/re-blossom.git
 ```
 If you want to make your own changes, then it's recommended to fork the
 repository on GitHub and clone your forked version.
-
-The repository includes an [esy](https://esy.sh) configuration to support Merlin
-and OCaml LSP development environments. To use it, be sure you launch your
-editor with the `esy` command, such as `esy vim`.
 
 Install the dependencies:
 ```sh
