@@ -37,39 +37,39 @@ let sortResult = (l, ~compare) =>
 
 describe("Trivial cases", () => {
   test("Empty input graph", () =>
-    IntMatch.make([]) |> IntMatch.toList |> expect |> toEqual([])
+    IntMatch.make([]) |> IntMatch.to_list |> expect |> toEqual([])
   );
   test("Single edge", () =>
     IntMatch.make([(0, 1, 1.)])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(0, 1), (1, 0)])
   );
   test("Two edges", () =>
     IntMatch.make([(1, 2, 10.), (2, 3, 11.)])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
   );
   test("Three edges", () =>
     IntMatch.make([(1, 2, 5.), (2, 3, 11.), (3, 4, 5.)])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
   );
   test("Three edges again, with IDs ordered differently", () =>
     IntMatch.make([(1, 2, 5.), (2, 3, 11.), (4, 3, 5.)])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(2, 3), (3, 2)])
   );
   test("A simple love triangle", () =>
     IntMatch.make([(0, 1, 6.), (0, 2, 10.), (1, 2, 5.)])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(0, 2), (2, 0)])
@@ -79,7 +79,7 @@ describe("Trivial cases", () => {
       [(1, 2, 5.), (2, 3, 11.), (3, 4, 5.)],
       ~cardinality=`Max,
     )
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 2), (2, 1), (3, 4), (4, 3)])
@@ -91,7 +91,7 @@ describe("Trivial cases", () => {
       (1, 3, 3.0),
       (1, 4, Js.Math.sqrt(2.0)),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 4), (2, 3), (3, 2), (4, 1)])
@@ -105,7 +105,7 @@ describe("Trivial cases", () => {
         (2, 4, (-1.)),
         (3, 4, (-6.)),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 2), (2, 1)])
@@ -122,7 +122,7 @@ describe("Trivial cases", () => {
           (3, 4, (-6.)),
         ],
       )
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 3), (2, 4), (3, 1), (4, 2)])
@@ -133,7 +133,7 @@ describe("Blossoms", () => {
   describe("create S-blossom and use it for augmentation.", () => {
     test("S-blossom A", () =>
       IntMatch.make([(1, 2, 8.), (1, 3, 9.), (2, 3, 10.), (3, 4, 7.)])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 2), (2, 1), (3, 4), (4, 3)])
@@ -147,7 +147,7 @@ describe("Blossoms", () => {
         (1, 6, 5.),
         (4, 5, 6.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 6), (2, 3), (3, 2), (4, 5), (5, 4), (6, 1)])
@@ -163,7 +163,7 @@ describe("Blossoms", () => {
         (4, 5, 4.),
         (1, 6, 3.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 6), (2, 3), (3, 2), (4, 5), (5, 4), (6, 1)])
@@ -177,7 +177,7 @@ describe("Blossoms", () => {
         (4, 5, 3.),
         (1, 6, 4.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 6), (2, 3), (3, 2), (4, 5), (5, 4), (6, 1)])
@@ -191,7 +191,7 @@ describe("Blossoms", () => {
         (4, 5, 3.),
         (3, 6, 4.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([(1, 2), (2, 1), (3, 6), (4, 5), (5, 4), (6, 3)])
@@ -207,7 +207,7 @@ describe("Blossoms", () => {
       (4, 5, 10.),
       (5, 6, 6.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 3), (2, 4), (3, 1), (4, 2), (5, 6), (6, 5)])
@@ -224,7 +224,7 @@ describe("Blossoms", () => {
       (6, 7, 10.),
       (7, 8, 8.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -251,7 +251,7 @@ describe("Blossoms", () => {
       (6, 7, 14.),
       (7, 8, 12.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -276,7 +276,7 @@ describe("Blossoms", () => {
       (4, 8, 14.),
       (5, 7, 13.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -302,7 +302,7 @@ describe("Blossoms", () => {
       (4, 7, 7.),
       (5, 6, 7.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -332,7 +332,7 @@ describe("Nasty cases", () => {
       (5, 7, 26.),
       (9, 10, 5.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -361,7 +361,7 @@ describe("Nasty cases", () => {
       (5, 7, 40.),
       (9, 10, 5.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -393,7 +393,7 @@ describe("Nasty cases", () => {
       (5, 7, 26.),
       (9, 10, 5.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -428,7 +428,7 @@ describe("Nasty cases", () => {
       (7, 10, 26.),
       (11, 12, 5.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -461,7 +461,7 @@ describe("Nasty cases", () => {
         (8, 10, 10.),
         (4, 9, 30.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -492,7 +492,7 @@ describe("Nasty cases", () => {
         (4, 9, 30.),
         (11, 10, 100.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -523,7 +523,7 @@ describe("Nasty cases", () => {
         (4, 9, 30.),
         (3, 6, 36.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -559,7 +559,7 @@ describe("More nasty cases", () => {
       (2, 1, 55.),
       (1, 0, 43.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -592,7 +592,7 @@ describe("More nasty cases", () => {
       (5, 4, 55.),
       (4, 10, 30.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -621,7 +621,7 @@ describe("More nasty cases", () => {
       (2, 8, 55.),
       (8, 7, 30.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -649,7 +649,7 @@ describe("Input tests", () => {
       (3, 1, 9000.),
       (3, 4, 7.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(1, 2), (2, 1), (3, 4), (4, 3)])
@@ -668,7 +668,7 @@ describe("Input tests", () => {
       (8, 10, 10.),
       ((-420), 9, 30.),
     ])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -705,7 +705,7 @@ describe("Input tests", () => {
         ((-7), (-10), 26.),
         ((-11), (-12), 5.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -737,7 +737,7 @@ describe("Input tests", () => {
         (3, 2, 14.),
         (2, 1, 12.),
       ])
-      |> IntMatch.toList
+      |> IntMatch.to_list
       |> sortResult(~compare)
       |> expect
       |> toEqual([
@@ -754,7 +754,7 @@ describe("Input tests", () => {
   });
   test("Vertices with edges on themselves are silently ignored.", () =>
     IntMatch.make([(0, 1, 1.), (1, 1, 9001.)])
-    |> IntMatch.toList
+    |> IntMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([(0, 1), (1, 0)])
@@ -775,7 +775,7 @@ describe("Input tests", () => {
       ("Gabriel", "Gabriel", 100.),
       ("Gabriel", "Andrew", 100.),
     ])
-    |> StringMatch.toList
+    |> StringMatch.to_list
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -844,7 +844,7 @@ describe("Input tests", () => {
         (Andrew, Philip, 10.),
         (Mark, James, 30.),
       ])
-      |> PersonMatch.toList
+      |> PersonMatch.to_list
       |> sortResult(~compare=Person.compare)
       |> expect
       |> toEqual(
@@ -904,7 +904,7 @@ describe("Input tests", () => {
         (Luke, Luke, 100.),
         (Luke, John, 100.),
       ])
-      |> PersonMatch.toList
+      |> PersonMatch.to_list
       |> sortResult(~compare=Person.compare)
       |> expect
       |> toEqual(
@@ -945,7 +945,7 @@ describe("Input tests", () => {
         (String("c"), String("e"), 10.),
         (Int(4), String("d"), 30.),
       ])
-      |> SOIMatch.toList
+      |> SOIMatch.to_list
       |> sortResult(~compare=StringOrInt.compare)
       |> expect
       |> toEqual(
@@ -980,14 +980,17 @@ describe("Output tests", () => {
       (8, 10, 10.),
       (4, 9, 30.),
     ]);
-  test("get", () =>
-    IntMatch.get(result, 5) |> expect |> toBe(Some(3))
+  test("find", () =>
+    IntMatch.find(result, 5) |> expect |> toBe(3)
   );
-  test("get None", () =>
-    IntMatch.get(result, 69) |> expect |> toBe(None)
+  test("find_opt", () =>
+    IntMatch.find_opt(result, 5) |> expect |> toBe(Some(3))
   );
-  test("toList", () =>
-    IntMatch.toList(result)
+  test("find_opt None", () =>
+    IntMatch.find_opt(result, 69) |> expect |> toBe(None)
+  );
+  test("to_list", () =>
+    IntMatch.to_list(result)
     |> sortResult(~compare)
     |> expect
     |> toEqual([
@@ -1003,19 +1006,19 @@ describe("Output tests", () => {
          (10, 8),
        ])
   );
-  test("forEach", () => {
+  test("iter", () => {
     let arr = Array.make(11, -1);
-    IntMatch.forEach(result, ~f=(v1, v2) => ignore(arr[v1] = v2));
+    IntMatch.iter(result, ~f=(v1, v2) => ignore(arr[v1] = v2));
     expect(arr) |> toEqual([|(-1), 2, 1, 5, 9, 3, 7, 6, 10, 4, 8|]);
   });
-  test("isEmpty", () =>
-    IntMatch.isEmpty(result) |> expect |> toBe(false)
+  test("is_empty", () =>
+    IntMatch.is_empty(result) |> expect |> toBe(false)
   );
-  test("has", () =>
-    result |> IntMatch.has(5) |> expect |> toBe(true)
+  test("mem", () =>
+    result |> IntMatch.mem(5) |> expect |> toBe(true)
   );
-  test("reduce", () =>
-    IntMatch.reduce(result, ~init="", ~f=(acc, v1, v2) =>
+  test("fold", () =>
+    IntMatch.fold(result, ~init="", ~f=(acc, v1, v2) =>
       Belt.Int.("(" ++ toString(v1) ++ ", " ++ toString(v2) ++ "), " ++ acc)
     )
     |> expect

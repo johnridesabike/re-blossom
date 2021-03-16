@@ -59,9 +59,9 @@
  ******************************************************************************/
 module ParityList = {
   /**
-   * This works like a linked list, only with the parity enforced.
-   * It's used to store each blossom's children. Whether a child is odd or even
-   * is significant.
+    This works like a linked list, only with the parity enforced.
+    It's used to store each blossom's children. Whether a child is odd or even
+    is significant.
    */
   type even('a) =
     | Empty
@@ -137,9 +137,9 @@ module ParityList = {
       Odd(head, Even.concat(tail, l2));
 
     /**
-     * Return the list _up to_, but _not including_, the item where
-     * `f(item) == true`, or return `None` if `f` never returns `true`.
-     * `f` is only applied to _even_ items.
+      Return the list _up to_, but _not including_, the item where
+      `f(item) == true`, or return `None` if `f` never returns `true`.
+      `f` is only applied to _even_ items.
      */
     let trimTo = (Odd(head, tail), ~f) => {
       let rec aux = acc =>
@@ -151,9 +151,9 @@ module ParityList = {
     };
 
     /**
-     * Return the list _from_, and _including_, the item where
-     * `f(item) == true`, or return `None` if `f` never returns `true`.
-     * `f` is only applied to _odd_ items.
+      Return the list _from_, and _including_, the item where
+      `f(item) == true`, or return `None` if `f` never returns `true`.
+      `f` is only applied to _odd_ items.
      */
     let rec trimFrom = (~f) =>
       fun
@@ -181,9 +181,7 @@ type graph('v) = {
   edges: list(edge('v)),
   vertexSize: int /* A cached size of the vertices list. */
 }
-/**
- * Edges represent a weighted connection between two vertices.
- */
+/** Edges represent a weighted connection between two vertices. */
 and edge('v) = {
   i: vertex('v), /* Not modified by the algorithm. */
   j: vertex('v), /* Not modified by the algorithm. */
@@ -193,8 +191,8 @@ and edge('v) = {
   mutable allowable,
 }
 /**
- * An endpoint represents where an edge connects to a vertex;
- * E.g.: `I(edge)` represents the vertex at `edge.i`.
+  An endpoint represents where an edge connects to a vertex;
+  E.g.: `I(edge)` represents the vertex at `edge.i`.
  */
 and endpoint('v) =
   | I(edge('v))
@@ -223,9 +221,7 @@ and basicNode('v, 'content, 'fields) = {
   mutable label: label('v),
   fields: 'fields,
 }
-/**
- * Vertices represent nodes of the input graph.
- */
+/** Vertices represent nodes of the input graph. */
 and vertexFields('v) = {
   /* A list of remote endpoints of the edges attached to the vertex. */
   /* Not modified by the algorithm. */
@@ -238,8 +234,8 @@ and vertexFields('v) = {
 }
 and vertex('v) = basicNode('v, 'v, vertexFields('v))
 /**
- * Blossoms, also called "super-vertices," are nodes that contain vertices and
- * other blossoms.
+  Blossoms, also called "super-vertices," are nodes that contain vertices and
+  other blossoms.
  */
 and blossomFields('v) = {
   /* A list of the blossom's sub-blossoms, starting with the base and going
@@ -266,15 +262,15 @@ and anyNode('v) =
   | Vertex(vertex('v))
   | Blossom(blossom('v))
 /**
- * Top-level blossoms are either unlabeled ("free"), labeled S with no
- * endpoint, S with an endpoint, or T with an endpoint.
- *
- * The label endpoint for a top-level blossom is the remote endpoint of the
- * edge through which the blossom obtained its label.
- *
- * If a vertex is inside a T blossom and is also labeled T, then the endpoint
- * is the remote endpoint of the edge through which the vertex is reachable
- * from outside the blossom.
+  Top-level blossoms are either unlabeled ("free"), labeled S with no
+  endpoint, S with an endpoint, or T with an endpoint.
+
+  The label endpoint for a top-level blossom is the remote endpoint of the
+  edge through which the blossom obtained its label.
+
+  If a vertex is inside a T blossom and is also labeled T, then the endpoint
+  is the remote endpoint of the edge through which the vertex is reachable
+  from outside the blossom.
  */
 and label('v) =
   | Free
@@ -289,9 +285,7 @@ and label('v) =
 module Edge = {
   type t('v) = edge('v);
 
-  /**
-   * Return the slack of the given edge. Does not work inside blossoms.
-   */
+  /** Return the slack of the given edge. Does not work inside blossoms. */
   let slack = ({i, j, weight, _}) => i.dualVar +. j.dualVar -. weight;
 
   let _debug = k => {
@@ -318,7 +312,7 @@ module Endpoint = {
     | J(edge) => I(edge);
 
   /**
-   * This is equivalent to, but more performant than, `reverse |> toVertex`.
+    This is equivalent to, but more performant than, `reverse |> toVertex`.
    */
   let toReverseVertex =
     fun
@@ -352,9 +346,7 @@ module Blossom = {
 module Node = {
   type t('v) = anyNode('v);
 
-  /**
-   * A blossom's base is the vertex at the head of its list of children.
-   */
+  /** A blossom's base is the vertex at the head of its list of children. */
   let rec baseVertex =
     fun
     | Vertex(vertex) => vertex
@@ -384,8 +376,8 @@ module Node = {
 
   module Leaves = {
     /**
-     * Reduce over the leaves of a node. Leaves are the vertices in a blossom's
-     * children, as well as the vertices in any of its sub-blossom's children.
+      Reduce over the leaves of a node. Leaves are the vertices in a blossom's
+      children, as well as the vertices in any of its sub-blossom's children.
      */
     let rec reduce = (~init, ~f) =>
       fun
@@ -428,24 +420,22 @@ module type S = {
   type t;
   let make:
     (~cardinality: cardinality=?, list((vertex, vertex, float))) => t;
-  let get: (t, vertex) => option(vertex);
-  let reduce: (t, ~init: 'acc, ~f: ('acc, vertex, vertex) => 'acc) => 'acc;
-  let forEach: (t, ~f: (vertex, vertex) => unit) => unit;
-  let toList: t => list((vertex, vertex));
-  let isEmpty: t => bool;
-  let has: (vertex, t) => bool;
+  let find: (t, vertex) => vertex;
+  let find_opt: (t, vertex) => option(vertex);
+  let fold: (t, ~init: 'acc, ~f: ('acc, vertex, vertex) => 'acc) => 'acc;
+  let iter: (t, ~f: (vertex, vertex) => unit) => unit;
+  let to_list: t => list((vertex, vertex));
+  let is_empty: t => bool;
+  let mem: (vertex, t) => bool;
 };
 
 module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
   type vertex = Ord.t;
   module Map = Map.Make(Ord);
-
   type t = Map.t(Endpoint.t(vertex));
 
   module Mates = {
-    /**
-   * Maps vertices to remote endpoints of their attached edges.
-   */
+    /** Maps vertices to remote endpoints of their attached edges. */
     type t = Map.t(Endpoint.t(vertex));
 
     let getExn = (mates, v) => Map.find(v.content, mates);
@@ -474,9 +464,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       | S(endpoint) => "S(" ++ Endpoint._debug(endpoint) ++ ")"
       | T(endpoint) => "T(" ++ Endpoint._debug(endpoint) ++ ")";
 
-    /**
-   * Label a vertex S and add its inBlossom's children to the queue.
-   */
+    /** Label a vertex S and add its inBlossom's children to the queue. */
     let assignS = (~v, ~label, ~queue) => {
       let b = v.fields.inBlossom;
       [%log.debug
@@ -500,9 +488,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     };
 
     /**
-   * Label a vertex T, label its mate S, and add its mate's inBlossom's children
-   * to the queue.
-   */
+     Label a vertex T, label its mate S, and add its mate's inBlossom's children
+     to the queue.
+    */
     let assignT = (~v, ~p, ~mates, ~queue) => {
       let b = v.fields.inBlossom;
       [%log.debug
@@ -527,14 +515,10 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       assignS(~v=mate, ~label=S(Endpoint.reverse(matep)), ~queue);
     };
 
-    /**
-   * Label a vertex T without stepping through to its mate.
-   */
+    /** Label a vertex T without stepping through to its mate. */
     let assignTSingleVertex = (~v, ~p) => v.label = T(p);
 
-    /**
-   * Label a vertex or blossom T without stepping through to its mate.
-   */
+    /** Label a vertex or blossom T without stepping through to its mate. */
     let assignTSingle = (~w, ~p) =>
       switch (w) {
       | Vertex(v) => assignTSingleVertex(~v, ~p)
@@ -542,30 +526,30 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       };
   };
 
-  /*******************************************************************************
+  /*****************************************************************************
    * Part III: Let's start making a graph
-   ******************************************************************************/
+   ****************************************************************************/
 
   module RawEdge: {
-    type t('v) = pri | Edge('v, 'v);
-    let make: ('v, 'v, ~cmp: ('v, 'v) => int) => option(t('v));
-    let makeCmp: (('v, 'v) => int, t('v), t('v)) => int;
+    type vertex = Ord.t;
+    type t = pri | Edge(vertex, vertex);
+    let make: (vertex, vertex) => option(t);
+    let compare: (t, t) => int;
   } = {
-    type t('v) =
-      | Edge('v, 'v);
+    type vertex = Ord.t;
+    type t =
+      | Edge(vertex, vertex);
 
-    /**
-   * It's important that edges are always in the same order.
-   */
-    let make = (i, j, ~cmp) =>
-      switch (cmp(i, j)) {
+    /** It's important that edges are always in the same order. */
+    let make = (i, j) =>
+      switch (Ord.compare(i, j)) {
       | 0 => None
       | x when x > 0 => Some(Edge(i, j))
       | _ => Some(Edge(j, i))
       };
 
-    let makeCmp = (vertexCmp, Edge(a, b), Edge(y, z)) =>
-      switch (vertexCmp(a, y), vertexCmp(b, z)) {
+    let compare = (Edge(a, b), Edge(y, z)) =>
+      switch (Ord.compare(a, y), Ord.compare(b, z)) {
       | (0, 0) => 0
       | (c, d) =>
         switch (c + d) {
@@ -575,20 +559,13 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       };
   };
 
-  let edgeCmp = RawEdge.makeCmp(Ord.compare);
-  module KSet =
-    Set.Make({
-      type t = RawEdge.t(Ord.t);
-      let compare = (a, b) => edgeCmp(a, b);
-    });
+  module KSet = Set.Make(RawEdge);
 
   module Graph = {
-    /**
-   * Turn the raw input into a recursive graph.
-   */
-    let make = (rawEdges, ~edgeCmp) => {
-      /* We need to be able to validate the input and identify duplicate vertices
-         and edges. We use a Map and Set to do this efficiently. */
+    /** Turn the raw input into a recursive graph. */
+    let make = rawEdges => {
+      /* We need to be able to validate the input and identify duplicate
+         vertices and edges. We use a Map and Set to do this efficiently. */
       let rec aux =
               (
                 ~rawEdges,
@@ -620,7 +597,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
           );
           setMaxWeight(vertices);
         | [(iContent, jContent, weight), ...rawEdges] =>
-          switch (RawEdge.make(iContent, jContent, ~cmp=edgeCmp)) {
+          switch (RawEdge.make(iContent, jContent)) {
           | None =>
             aux(
               ~rawEdges,
@@ -794,9 +771,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     };
   };
 
-  /*******************************************************************************
+  /*****************************************************************************
    * Part IV: Add, augment, and expand blossoms
-   ******************************************************************************/
+   ****************************************************************************/
 
   module AddBlossom = {
     /* First, we trace the graph to see if we are able to add a blossom. */
@@ -810,9 +787,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       | NewBlossom(ParityList.Odd.t(Child.t('v)));
 
     /**
-   * Trace back to the next S-blossom and add the path of blossoms to the list
-   * of children.
-   */
+    Trace back to the next S-blossom and add the path of blossoms to the list
+    of children.
+    */
     let traceBackward = (w, backChildren) =>
       switch (Node.label(w)) {
       | Free
@@ -836,9 +813,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       };
 
     /**
-   * Trace forward to the next S-blossom and add the path of blossoms to the
-   * list of children.
-   */
+     Trace forward to the next S-blossom and add the path of blossoms to the
+     list of children.
+    */
     let traceForward = (v, frontChildren) =>
       switch (Node.label(v)) {
       | Free
@@ -861,9 +838,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
         };
       };
 
-    /**
-   * Scan the found children to see if there's a connecting "base" node.
-   */
+    /** Scan the found children to see if there's a connecting "base" node. */
     let findConnection = (lastV, nextW, front, back) => {
       open ParityList;
       let children = Odd.concatEven(front, Even.reverse(back));
@@ -875,9 +850,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     };
 
     /**
-   * Trace back from the given edge's vertices to discover either a new blossom
-   * or an augmenting path.
-   */
+     Trace back from the given edge's vertices to discover either a new blossom
+     or an augmenting path.
+    */
     let scanForBlossom = ({i, j, _} as edge) => {
       [%log.debug
         "scanBlossom";
@@ -926,10 +901,10 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     /* Now we can create a blossom. */
 
     /**
-   * If the node has an edge set but with a higher slack, then update the node
-   * with the new edge. If the node has not been set yet, then add it with the
-   * new edge.
-   */
+     If the node has an edge set but with a higher slack, then update the node
+     with the new edge. If the node has not been set yet, then add it with the
+     new edge.
+    */
     let setBestEdgeMap = (~w, ~edge, map) => {
       /* This does not preserve the order, which should not matter. */
       let rec aux = (~acc, ~hasBeenSet) =>
@@ -1016,11 +991,11 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       );
 
     /**
-   * Construct a new blossom with a given base, containing an edge which
-   * connects a pair of S vertices. Label the new blossom as S; relabel its
-   * T-vertices to S and add them to the queue.
-   */
-    let makeBlossom = (graph, children, queue) => {
+     Construct a new blossom with a given base, containing an edge which
+     connects a pair of S vertices. Label the new blossom as S; relabel its
+     T-vertices to S and add them to the queue.
+    */
+    let make = (graph, children, queue) => {
       let content = graph.nextBlossom;
       graph.nextBlossom = succ(content);
       let ParityList.Odd({node: baseNode, _}, _) = children;
@@ -1042,7 +1017,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
         }
       );
       /* Relabel the vertices. */
-      let blossom = Blossom(b); /* minor performance gain to construct it once. */
+      let blossom = Blossom(b); // minor performance gain to construct it once.
       let queue =
         Node.Leaves.reduce(
           blossom,
@@ -1082,8 +1057,6 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
 
       getBestEdge(b.fields.blossomBestEdges);
     };
-    /* Aliasing `make` and `makeBlossom` for better JavaScript debugging. */
-    let make = makeBlossom;
   };
 
   module ModifyBlossom = {
@@ -1111,9 +1084,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
         });
 
     /**
-   * Remove the base child and split the remaining children into two lists, one
-   * before and one and after the entry child.
-   */
+     Remove the base child and split the remaining children into two lists, one
+     before and one and after the entry child.
+    */
     let splitChildren = (Odd(base, rest), entryChild) => {
       let rec aux = (front, back) =>
         switch (back) {
@@ -1147,10 +1120,10 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       | Forward;
 
     /**
-   * Swap matched/unmatched edges over an alternating path through a blossom
-   * between vertex `v` and the base vertex. Keep blossom bookkeeping
-   * consistent.
-   */
+     Swap matched/unmatched edges over an alternating path through a blossom
+     between vertex `v` and the base vertex. Keep blossom bookkeeping
+     consistent.
+    */
     let rec augment = (b, v, mates) => {
       [%log.debug
         "augmentBlossom";
@@ -1239,9 +1212,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
           relabelToBase(nextEndpoint, queue, mates, direction, rest);
         };
 
-    /**
-   * Expand the given top-level blossom.
-   */
+    /** Expand the given top-level blossom. */
     let rec expand = (~graph, ~b, ~stage, ~mates, ~queue) => {
       let _debug_endstage =
         switch (stage) {
@@ -1414,9 +1385,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
           One(max(delta, 0.));
         };
 
-    /**
-   * Compute delta4: minimum z variable of any T-blossom.
-   */
+    /** Compute delta4: minimum z variable of any T-blossom. */
     let four = (deltaType, ~graph) => {
       let rec aux = deltaType =>
         fun
@@ -1459,9 +1428,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       | {label: Free | SingleS | S(_) | T(_), _} => deltaType;
 
     /**
-   * Compute delta3: half the minimum slack on any edge between a pair of
-   * S-blossoms.
-   */
+     Compute delta3: half the minimum slack on any edge between a pair of
+     S-blossoms.
+    */
     let three = (deltaType, ~graph) => {
       let rec auxBlossoms = deltaType =>
         fun
@@ -1475,9 +1444,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     };
 
     /**
-   * Compute delta2: the minimum slack on any edge between an S-vertex and a
-   * free vertex.
-   */
+     Compute delta2: the minimum slack on any edge between an S-vertex and a
+     free vertex.
+    */
     let two = (deltaType, ~graph) => {
       let rec aux = deltaType =>
         fun
@@ -1504,9 +1473,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       aux(deltaType, graph.vertices);
     };
 
-    /**
-   * Compute delta1: the minimum value of any vertex dual variable.
-   */
+    /** Compute delta1: the minimum value of any vertex dual variable. */
     let one = (~cardinality, ~graph) => {
       let deltaType =
         switch (cardinality) {
@@ -1520,19 +1487,19 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
 
   module Substage = {
     /**
-   * Each iteration of the loop is a "substage." A substage tries to find an
-   * augmenting path. If found, the path is used to improve the matching and the
-   * stage ends. If there is no augmenting path, the primal-dual method is used
-   * to pump some slack out of the dual variables.
-   */
+     Each iteration of the loop is a "substage." A substage tries to find an
+     augmenting path. If found, the path is used to improve the matching and the
+     stage ends. If there is no augmenting path, the primal-dual method is used
+     to pump some slack out of the dual variables.
+    */
     type t('v, 'id) =
       | Augmented(Mates.t)
       | NotAugmented(list(Vertex.t('v)), Mates.t);
 
     /**
-   * Match vertex `s` to remote endpoint `p`. Then trace back from `s` until we
-   * find a single vertex, swapping matched and unmatched edges as we go.
-   */
+     Match vertex `s` to remote endpoint `p`. Then trace back from `s` until we
+     find a single vertex, swapping matched and unmatched edges as we go.
+    */
     let rec augmentMatchingLoop = (mates, ~s, ~p) => {
       let mates =
         switch (s.fields.inBlossom) {
@@ -1574,10 +1541,10 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     };
 
     /**
-   * Swap matched/unmatched edges over an alternating path between two single
-   * vertices. The augmenting path runs through the edge which connects a pair
-   * of S vertices.
-   */
+     Swap matched/unmatched edges over an alternating path between two single
+     vertices. The augmenting path runs through the edge which connects a pair
+     of S vertices.
+    */
     let augmentMatching = (edge, mates) => {
       [%log.debug
         "augmentMatching";
@@ -1718,9 +1685,9 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     };
 
     /**
-   * Continue labeling until all vertices which are reachable through an
-   * alternating path have gotten a label.
-   */
+     Continue labeling until all vertices which are reachable through an
+     alternating path have gotten a label.
+    */
     let rec labelingLoop = (graph, mates) =>
       fun
       | [] => NotAugmented([], mates)
@@ -1732,7 +1699,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
           };
         };
 
-    let rec substage = (graph, queue, mates, cardinality) => {
+    let rec make = (graph, queue, mates, cardinality) => {
       %log.debug
       "SUBSTAGE";
       switch (labelingLoop(graph, mates, queue)) {
@@ -1759,13 +1726,13 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
             };
           let queue = [nextVertex, ...queue];
           edge.allowable = Allowed;
-          substage(graph, queue, mates, cardinality);
+          make(graph, queue, mates, cardinality);
         /* Use the least-slack edge to continue the search. */
         | Delta.Three(delta, edge) =>
           Graph.updateDualVarsByDelta(graph, ~delta);
           let queue = [edge.i, ...queue];
           edge.allowable = Allowed;
-          substage(graph, queue, mates, cardinality);
+          make(graph, queue, mates, cardinality);
         /* Expand the least-z blossom. */
         | Delta.Four(delta, b) =>
           Graph.updateDualVarsByDelta(graph, ~delta);
@@ -1777,18 +1744,16 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
               ~queue,
               ~mates,
             );
-          substage(graph, queue, mates, cardinality);
+          make(graph, queue, mates, cardinality);
         };
       | Augmented(_) as augmented => augmented
       };
     };
-    /* Aliasing `make` and `substage` for better JavaScript debugging. */
-    let make = substage;
   };
 
   /**
- * Remove labels, forget least-slack edges and allowable edges, and empty queue.
- */
+   Remove labels, forget least-slack edges and allowable edges, and empty queue.
+  */
   let resetStage = (~graph, ~mates) => {
     let {vertices, blossoms, edges, _} = graph;
     /* Label all single blossoms/vertices with S and put them in the queue. */
@@ -1850,10 +1815,8 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
   };
 
   let make = (~cardinality=`NotMax, edges) => {
-    let graph = Graph.make(edges, ~edgeCmp=Ord.compare);
-    /**
-   * Loop until no further improvement is possible.
-   */
+    let graph = Graph.make(edges);
+    /** Loop until no further improvement is possible. */
     let rec aux = (mates, stageNum): t =>
       if (stageNum == graph.vertexSize) {
         Map.empty;
@@ -1875,30 +1838,32 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     aux(Map.empty, 0);
   };
 
-  let get = (mates, v) =>
+  let find = (mates, v) => mates |> Map.find(v) |> Mates.exportEndpoint;
+
+  let find_opt = (mates, v) =>
     switch (Map.find_opt(v, mates)) {
     | None => None
     | Some(p) => Some(Mates.exportEndpoint(p))
     };
 
-  let reduce = (mates: t, ~init, ~f) =>
+  let fold = (mates: t, ~init, ~f) =>
     Map.fold(
       (v1, p, acc) => f(acc, v1, Mates.exportEndpoint(p)),
       mates,
       init,
     );
 
-  let forEach = (mates, ~f) =>
+  let iter = (mates, ~f) =>
     Map.iter((v1, p) => f(v1, Mates.exportEndpoint(p)), mates);
 
-  let toList = mates =>
+  let to_list = mates =>
     Map.fold(
       (v, p, acc) => [(v, Mates.exportEndpoint(p)), ...acc],
       mates,
       [],
     );
 
-  let isEmpty = Map.is_empty;
+  let is_empty = Map.is_empty;
 
-  let has = Map.mem;
+  let mem = Map.mem;
 };

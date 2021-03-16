@@ -33,33 +33,28 @@ It finds a maximum matching of vertices on general, undirected, weighted graphs.
 
 [@text
   {|
-{1 Installation}
 
-Re-Blossom requires {{: https://bucklescript.github.io/} BuckleScript} as a peer
-dependency, so you will have to install it separately. Add it by running:
+{1 Notice}
 
-{[
-  npm install bs-platform -D
-]}
+If you're using {{: https://rescript-lang.org} ReScript}, check out {{:
+https://github.com/johnridesabike/rescript-blossom} ReScript-Blossom}. It's
+the same algorithm, but optimized for a JavaScript environment.
 
+This package originally had similar optimizations, but I've reworked it to be
+more compatible with native-Reason. This package currently still relies on
+[bs-platform] to compile to JavaScript, but that's only for the debugging and
+testing code. All of the core code should be native-compatible.
 
-Now you can add Re-Blossom to your project by running:
-{[
-  npm install re-blossom
-]}
+I'm not currently using this package in a native environment, so I haven't
+fully converted it yet. If you think you will find this useful, I encourage
+you to fork it and make the modifications you need.
 
-You will need to edit your project's [bsconfig.json] file and list Re-Blossom
-in the [bs-dependencies].
-
-{[
-{
-  "bs-dependencies": [
-    "re-blossom"
-  ]
-}
-]}
-
-You can now access this module as [Blossom.Match].
+This algorithm passes all of the tests from similar implementations, but hasn't
+seen much real-world use. There may still be failure states that have not been
+discovered yet. The specific dangers are [Failure] exceptions, infinite loops,
+or missing pairings. These should never happen, but, if they do, please
+{{: https://github.com/johnridesabike/re-blossom/issues} file an issue} with
+information about your graph.
 
 {1 How it works}
 
@@ -182,32 +177,34 @@ let graph = [
 ];
 ]}
 
-You can match them with {!String.make}.
+First, build an implementation with {!Make}.
 
 {[
-let result = Blossom.Match.String.make(graph);
+module StringMatch = Blossom.Match.Make(String);
 ]}
 
-You can also use {!Int.make} for integer vertices.
+Then, use your implementation's {!S.make} function to produce a result.
+
+{[
+let result = StringMatch.make(graph);
+]}
 
 {2 Using the output}
 
 The algorithm returns a bi-directional map of each vertex to its mate vertex.
 
 {[
-Blossom.Match.get(result, "Mary") == Some("Joseph");
-Blossom.Match.get(result, "Joseph") == Some("Mary");
+StringMatch.find(result, "Mary") == "Joseph";
+StringMatch.find(result, "Joseph") == "Mary";
 ]}
 
-It's powered by [Belt.Map] under the hood. You can convert it to a proper
-[Belt.Map] with {!toMap}, or a list with {!toList}. {i The output of these will
+You can convert it to a list with {!S.to_list}. {i The output of these will
 have each pairing twice.} This is because it treats each order ([(a, b)] vs
-[(b, a)]) separately. In practice, this is useful so you can use [Belt.Map.get]
-or [Belt.List.getAssoc] to get any vertex's mate.
+[(b, a)]) separately.
 
 {2 Maximum cardinality}
 
-The {!make} functions accepts one optional parameter, [cardinality], which can
+The {!make} function accepts one optional parameter, [cardinality], which can
 be the value [`Max]. This enables "maximum cardinality" matching, where the
 algorithm will only accept solutions that use as many edges as possible, even
 extremely undesirable ones (such as ones with negative weights).
@@ -221,51 +218,14 @@ let graph = [
   (3, 4, (-6.)),
 ];
 
-let result = Blossom.Match.Int.make(graph);
+module IntMatch = Blossom.Match.Make(Int);
+
+let result = IntMatch.make(graph);
 /* result: (1, 2) */
 
-let result = Blossom.Match.Int.make(~cardinality=`Max, graph);
+let result = IntMatch.make(~cardinality=`Max, graph);
 /* result: (1, 3), (2, 4) */
 ]}
-
-{2 Your own types}
-
-To use your own type, first you need a module that conforms to the
-{!type:comparable} signature. (If you've used the [Belt.Id] module before, this
-should be familiar.)
-
-{[
-module MyType: {
-  type t;
-  let cmp: (t, t) => int;
-} = {
-  /* implementation goes here */
-};
-
-module MyTypeCmp = Blossom.Match.MakeComparable(MyType);
-]}
-
-Now you can call {!make} with the  module and your list of edges.
-
-{[
-let result = Blossom.Match.make(~id=(module MyTypeCmp), graph);
-]}
-
-You can also reuse an existing Belt [Comparable] module by using
-{!unsafeComparableFromBelt}. The use case for that is when you need the
-[identity] type shared between modules.
-
-{1 Beta warning}
-
-This algorithm passes all of the tests from similar implementations, but hasn't
-seen much real-world use. There may still be failure states that have not been
-discovered yet. The specific dangers are [Failure] exceptions, infinite loops,
-or missing pairings. These should never happen, but, if they do, please
-{{: https://github.com/johnridesabike/re-blossom/issues} file an issue} with
-information about your graph.
-
-This code uses BuckleScript-specific optimizations so it can compile to
-efficient JavaScript. In the future, it may support other platforms as well.
 
 {1 Interface}
 
@@ -279,103 +239,76 @@ efficient JavaScript. In the future, it may support other platforms as well.
  */
 type cardinality = [ | `Max | `NotMax];
 
+/** Input signature of the functor {!Make}. */
 module type OrderedType = {
+  /** The type of the vertices. */
   type t;
   let compare: (t, t) => int;
 };
 
+/** Output signature of the functor {!Make}. */
 module type S = {
   type vertex;
   /**
-  A bi-directional, read-only mapping of each vertex to its mate vertex.
- */
+   A bi-directional, read-only mapping of each vertex to its mate vertex.
+  */
   type t;
 
   [@text {|{2 Functions}|}];
 
   /**
-  Computes a maximum-weighted matching on a general undirected weighted graph.
-  This function takes time O(n³). See {!section:usage} for examples of its use.
+   Computes a maximum-weighted matching on a general undirected weighted graph.
+   This function takes time O(n³). See {!section:usage} for examples of its use.
 
-  Accepts a list of tuples [(i, j, w)], each describing an undirected edge
-  between vertex [i] and vertex [j] with weight [w]. There is at most one edge
-  between any two vertices, and no vertex has an edge to itself. Duplicate
-  edges are ignored.
+   Accepts a list of tuples [(i, j, w)], each describing an undirected edge
+   between vertex [i] and vertex [j] with weight [w]. There is at most one edge
+   between any two vertices, and no vertex has an edge to itself. Duplicate
+   edges are ignored.
 
-  {!Int.make} and {!String.make} are prepackaged versions of this function for
-  [int] and [string] vertices, respectively.
-
-  @param cardinality When set to [`Max], only maximum-cardinality matchings are
-  considered as solutions. [`NotMax] is the default.
-
-  @param id A first-class module created by {!val:comparable} or
-  {!MakeComparable}.
- */
+   @param cardinality When set to [`Max], only maximum-cardinality matchings are
+   considered as solutions. [`NotMax] is the default.
+  */
   let make:
     (~cardinality: cardinality=?, list((vertex, vertex, float))) => t;
 
   /**
-  Returns [Some(mate)] for a mated vertex, or [None] if none exists.
+   Returns [mate] for a mated vertex, or raises [Not_found] if no such binding
+   exists.
+  */
+  let find: (t, vertex) => vertex;
 
-  {[Blossom.Match.get(result, "Mary") == Some("Joseph");]}
- */
-  let get: (t, vertex) => option(vertex);
-
-  /**
-  Reduces over the pairs of vertex mates. Each pair is used twice, once in each
-  order.
-
-  {[
-    let list =
-      Blossom.Match.reduce(result, ~init=[], ~f=(acc, v1, v2) => [(v1, v2), ...acc]);
-  ]}
- */
-  let reduce: (t, ~init: 'acc, ~f: ('acc, vertex, vertex) => 'acc) => 'acc;
+  /** Returns [Some(mate)] for a mated vertex, or [None] if none exists. */
+  let find_opt: (t, vertex) => option(vertex);
 
   /**
-  Iterates over the pairs of vertex mates. Each pair is used twice, once in
-  each order.
-
-  {[Blossom.Match.forEach(result, ~f=(v1, v2) => Js.log2(v1, v2));]}
- */
-  let forEach: (t, ~f: (vertex, vertex) => unit) => unit;
+   Folds over the pairs of vertex mates. Each pair is used twice, once in each
+   order.
+  */
+  let fold: (t, ~init: 'acc, ~f: ('acc, vertex, vertex) => 'acc) => 'acc;
 
   /**
-  Returns a list of tuples for each pair of vertex mates. Each pair is used
-  twice, once in each order.
-
-  {[
-    Blossom.Match.toList(result) == [
-      ("Raphael", "Michael"),
-      ("Peter", "John"),
-      ("Paul", "James"),
-      ("Michael", "Raphael"),
-      ("Mary", "Joseph"),
-      ("Joseph", "Mary"),
-      ("John", "Peter"),
-      ("James", "Paul"),
-      ("Gabriel", "Andrew"),
-      ("Andrew", "Gabriel"),
-    ];
-  ]}
- */
-  let toList: t => list((vertex, vertex));
+   Iterates over the pairs of vertex mates. Each pair is used twice, once in
+   each order.
+  */
+  let iter: (t, ~f: (vertex, vertex) => unit) => unit;
 
   /**
-  Returns [true] if there are no mates, [false] otherwise.
+   Returns a list of tuples for each pair of vertex mates. Each pair is used
+   twice, once in each order.
+  */
+  let to_list: t => list((vertex, vertex));
 
-  {[Blossom.Match.isEmpty(result) == false;]}
- */
-  let isEmpty: t => bool;
+  /** Returns [true] if there are no mates, [false] otherwise. */
+  let is_empty: t => bool;
 
-  /**
-  Returns [true] if the vertex has a mate, [false] otherwise.
-
-  {[Blossom.Match.has(result, "Mary") == true;]}
- */
-  let has: (vertex, t) => bool;
+  /** Returns [true] if the vertex has a mate, [false] otherwise. */
+  let mem: (vertex, t) => bool;
 };
 
+/**
+ Functor building an implementation of the blossom algorithmstructure given a
+ totally ordered type.
+*/
 module Make: (Ord: OrderedType) => S with type vertex = Ord.t;
 
 [@text

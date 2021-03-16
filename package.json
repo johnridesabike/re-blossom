@@ -48,7 +48,7 @@
     "bs-platform": "^8.0.2"
   },
   "devDependencies": {
-    "@glennsl/bs-jest": "^0.5.1",
+    "@glennsl/bs-jest": "^0.7.0",
     "benchmark": "^2.1.4",
     "bs-platform": "^8.0.2",
     "bsdoc": "^6.0.2-alpha",
