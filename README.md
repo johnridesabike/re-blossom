@@ -18,7 +18,7 @@ the same algorithm, but optimized for a JavaScript environment.
 
 This package originally had similar optimizations, but I've reworked it to be
 more compatible with native-Reason. This package currently still relies on
-[bs-platform] to compile to JavaScript, but that's only for testing. All of
+`bs-platform` to compile to JavaScript, but that's only for testing. All of
 the core modules should be native-compatible.
 
 I'm not currently using this package in a native environment, so I haven't
