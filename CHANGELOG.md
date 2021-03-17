@@ -1,5 +1,17 @@
 # Re-Blossom Changelog
 
+## 2.0.0
+
+This is a big refactor that drastically changes the public API. It no longer
+relies on the BuckleScript/JavaScript environment, so it should be usable on
+native with only minor tweaks.
+
+- Removed almost all dependencies on `bs-platform`.
+- Removed `Comparable` module type and its associated modules and functions.
+- Converted main module into a functor, `Make`, that creates a specific
+  implementation for a type.
+- Renamed public API functions to be consistent with OCaml stdlib functions.
+
 ## 1.1.1
 - Improved documentation.
 

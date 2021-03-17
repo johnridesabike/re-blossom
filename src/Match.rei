@@ -28,37 +28,33 @@ the famous {{: https://en.wikipedia.org/wiki/Blossom_algorithm} blossom algorith
 It finds a maximum matching of vertices on general, undirected, weighted graphs.
 
 {{: https://github.com/johnridesabike/re-blossom} Browse the source.}
-|}];
+|}
+];
 
 [@text
   {|
-{1 Installation}
 
-Re-Blossom requires {{: https://bucklescript.github.io/} BuckleScript} as a peer
-dependency, so you will have to install it separately. Add it by running:
+{1 Notice}
 
-{[
-  npm install bs-platform -D
-]}
+If you're using {{: https://rescript-lang.org} ReScript}, check out {{:
+https://github.com/johnridesabike/rescript-blossom} ReScript-Blossom}. It's
+the same algorithm, but optimized for a JavaScript environment.
 
+This package originally had similar optimizations, but I've reworked it to be
+more compatible with native-Reason. This package currently still relies on
+[bs-platform] to compile to JavaScript, but that's only for testing. All of
+the core modules should be native-compatible.
 
-Now you can add Re-Blossom to your project by running:
-{[
-  npm install re-blossom
-]}
+I'm not currently using this package in a native environment, so I haven't
+fully converted it yet. If you think you will find this useful, I encourage
+you to fork it and make the modifications you need.
 
-You will need to edit your project's [bsconfig.json] file and list Re-Blossom
-in the [bs-dependencies].
-
-{[
-{
-  "bs-dependencies": [
-    "re-blossom"
-  ]
-}
-]}
-
-You can now access this module as [Blossom.Match].
+This algorithm passes all of the tests from similar implementations, but hasn't
+seen much real-world use. There may still be failure states that have not been
+discovered yet. The specific dangers are [Failure] exceptions, infinite loops,
+or missing pairings. These should never happen, but, if they do, please
+{{: https://github.com/johnridesabike/re-blossom/issues} file an issue} with
+information about your graph.
 
 {1 How it works}
 
@@ -181,32 +177,34 @@ let graph = [
 ];
 ]}
 
-You can match them with {!String.make}.
+First, build an implementation with {!Make}.
 
 {[
-let result = Blossom.Match.String.make(graph);
+module StringMatch = Blossom.Match.Make(String);
 ]}
 
-You can also use {!Int.make} for integer vertices.
+Then, use your implementation's {!S.make} function to produce a result.
+
+{[
+let result = StringMatch.make(graph);
+]}
 
 {2 Using the output}
 
 The algorithm returns a bi-directional map of each vertex to its mate vertex.
 
 {[
-Blossom.Match.get(result, "Mary") == Some("Joseph");
-Blossom.Match.get(result, "Joseph") == Some("Mary");
+StringMatch.find(result, "Mary") == "Joseph";
+StringMatch.find(result, "Joseph") == "Mary";
 ]}
 
-It's powered by [Belt.Map] under the hood. You can convert it to a proper
-[Belt.Map] with {!toMap}, or a list with {!toList}. {i The output of these will
+You can convert it to a list with {!S.to_list}. {i The output of these will
 have each pairing twice.} This is because it treats each order ([(a, b)] vs
-[(b, a)]) separately. In practice, this is useful so you can use [Belt.Map.get]
-or [Belt.List.getAssoc] to get any vertex's mate.
+[(b, a)]) separately.
 
 {2 Maximum cardinality}
 
-The {!make} functions accepts one optional parameter, [cardinality], which can
+The {!make} function accepts one optional parameter, [cardinality], which can
 be the value [`Max]. This enables "maximum cardinality" matching, where the
 algorithm will only accept solutions that use as many edges as possible, even
 extremely undesirable ones (such as ones with negative weights).
@@ -220,51 +218,14 @@ let graph = [
   (3, 4, (-6.)),
 ];
 
-let result = Blossom.Match.Int.make(graph);
+module IntMatch = Blossom.Match.Make(Int);
+
+let result = IntMatch.make(graph);
 /* result: (1, 2) */
 
-let result = Blossom.Match.Int.make(~cardinality=`Max, graph);
+let result = IntMatch.make(~cardinality=`Max, graph);
 /* result: (1, 3), (2, 4) */
 ]}
-
-{2 Your own types}
-
-To use your own type, first you need a module that conforms to the
-{!type:comparable} signature. (If you've used the [Belt.Id] module before, this
-should be familiar.)
-
-{[
-module MyType: {
-  type t;
-  let cmp: (t, t) => int;
-} = {
-  /* implementation goes here */
-};
-
-module MyTypeCmp = Blossom.Match.MakeComparable(MyType);
-]}
-
-Now you can call {!make} with the  module and your list of edges.
-
-{[
-let result = Blossom.Match.make(~id=(module MyTypeCmp), graph);
-]}
-
-You can also reuse an existing Belt [Comparable] module by using
-{!unsafeComparableFromBelt}. The use case for that is when you need the
-[identity] type shared between modules.
-
-{1 Beta warning}
-
-This algorithm passes all of the tests from similar implementations, but hasn't
-seen much real-world use. There may still be failure states that have not been
-discovered yet. The specific dangers are [Failure] exceptions, infinite loops,
-or missing pairings. These should never happen, but, if they do, please
-{{: https://github.com/johnridesabike/re-blossom/issues} file an issue} with
-information about your graph.
-
-This code uses BuckleScript-specific optimizations so it can compile to
-efficient JavaScript. In the future, it may support other platforms as well.
 
 {1 Interface}
 
@@ -272,265 +233,89 @@ efficient JavaScript. In the future, it may support other platforms as well.
 |}
 ];
 
-module Internal: {
-  type cmp('vertex, 'identity);
-  type edgeCmp('v, 'identity, 'vertexIdentity);
-};
-
-module type Comparable = {
-  type t;
-  type identity;
-  type edgeIdentity;
-  let cmp: Internal.cmp(t, identity);
-  let edgeCmp: Internal.edgeCmp(t, edgeIdentity, identity);
-  module BeltCmp:
-    Belt.Id.Comparable with type t = t and type identity = identity;
-};
-
-/**
-  A module of functions with a unique identity type. It is analogous to the
-  type [Belt.Id.comparable]. Create one with the {!val:comparable} function or the
-  {!MakeComparable} functor. Or create one with an existing [Belt.Id.comparable]
-  module with {!unsafeComparableFromBelt}.
- */
-type comparable('vertex, 'id) = (module Comparable with
-                                    type identity = 'id and type t = 'vertex);
-
 /**
   Represents whether or not the algorithm should {i only} accept
   maximum-cardinality solutions.
  */
 type cardinality = [ | `Max | `NotMax];
 
-/**
-  A bi-directional, read-only mapping of each vertex to its mate vertex.
- */
-type t('vertex, 'id);
-
-[@text {|{2 Functions}|}];
-
-/**
-  Computes a maximum-weighted matching on a general undirected weighted graph.
-  This function takes time O(n³). See {!section:usage} for examples of its use.
-
-  Accepts a list of tuples [(i, j, w)], each describing an undirected edge
-  between vertex [i] and vertex [j] with weight [w]. There is at most one edge
-  between any two vertices, and no vertex has an edge to itself. Duplicate
-  edges are ignored.
-
-  {!Int.make} and {!String.make} are prepackaged versions of this function for
-  [int] and [string] vertices, respectively.
-
-  @param cardinality When set to [`Max], only maximum-cardinality matchings are
-  considered as solutions. [`NotMax] is the default.
-
-  @param id A first-class module created by {!val:comparable} or
-  {!MakeComparable}.
- */
-let make:
-  (
-    ~cardinality: cardinality=?,
-    list(('vertex, 'vertex, float)),
-    ~id: comparable('vertex, 'id)
-  ) =>
-  t('vertex, 'id);
-
-/**
-  Returns [Some(mate)] for a mated vertex, or [None] if none exists.
-
-  {[Blossom.Match.get(result, "Mary") == Some("Joseph");]}
- */
-let get: (t('vertex, 'id), 'vertex) => option('vertex);
-
-/**
-  Reduces over the pairs of vertex mates. Each pair is used twice, once in each
-  order.
-
-  {[
-    let list =
-      Blossom.Match.reduce(result, ~init=[], ~f=(acc, v1, v2) => [(v1, v2), ...acc]);
-  ]}
- */
-let reduce:
-  (t('vertex, 'id), ~init: 'acc, ~f: ('acc, 'vertex, 'vertex) => 'acc) => 'acc;
-
-/**
-  Reduces over the pairs of vertex mates. Each pair is used twice, once in each
-  order.
-
-  Takes an uncurried [f] function.
-
-  {[
-  let list =
-    Blossom.Match.reduce(result, ~init=[], ~f=(. acc, v1, v2) => [(v1, v2), ...acc]);
-  ]}
- */
-let reduceU:
-  (t('vertex, 'id), ~init: 'acc, ~f: (. 'acc, 'vertex, 'vertex) => 'acc) =>
-  'acc;
-
-/**
-  Iterates over the pairs of vertex mates. Each pair is used twice, once in
-  each order.
-
-  {[Blossom.Match.forEach(result, ~f=(v1, v2) => Js.log2(v1, v2));]}
- */
-let forEach: (t('vertex, 'id), ~f: ('vertex, 'vertex) => unit) => unit;
-
-/**
-  Iterates over the pairs of vertex mates. Each pair is used twice, once in
-  order.
-
-  Takes an uncurried [f] function.
-
-
-  {[Blossom.Match.forEach(result, ~f=(. v1, v2) => Js.log2(v1, v2));]}
- */
-let forEachU: (t('vertex, 'id), ~f: (. 'vertex, 'vertex) => unit) => unit;
-
-/**
-  Returns a [Belt.Map.t] where each key is a vertex and each value is its mate.
-
-  {[
-  let map = Blossom.Match.toMap(result);
-  Belt.Map.get(map, "Mary") == Some("Joseph");
-  ]}
- */
-let toMap: t('vertex, 'id) => Belt.Map.t('vertex, 'vertex, 'id);
-
-/**
-  Returns a list of tuples for each pair of vertex mates. Each pair is used
-  twice, once in each order.
-
-  {[
-    Blossom.Match.toList(result) == [
-      ("Raphael", "Michael"),
-      ("Peter", "John"),
-      ("Paul", "James"),
-      ("Michael", "Raphael"),
-      ("Mary", "Joseph"),
-      ("Joseph", "Mary"),
-      ("John", "Peter"),
-      ("James", "Paul"),
-      ("Gabriel", "Andrew"),
-      ("Andrew", "Gabriel"),
-    ];
-  ]}
- */
-let toList: t('vertex, 'id) => list(('vertex, 'vertex));
-
-/**
-  Returns [true] if there are no mates, [false] otherwise.
-
-  {[Blossom.Match.isEmpty(result) == false;]}
- */
-let isEmpty: t('vertex, 'id) => bool;
-
-/**
-  Returns [true] if the vertex has a mate, [false] otherwise.
-
-  {[Blossom.Match.has(result, "Mary") == true;]}
- */
-let has: (t('vertex, 'id), 'vertex) => bool;
-
-[@text {|{2 Prepackaged modules}|}];
-
-/**
-  Prepackaged module for building graphs with [int] vertices.
- */
-module Int: {
-  module Cmp: Comparable with type t = int;
-  type nonrec t = t(int, Cmp.identity);
-  let make: (~cardinality: cardinality=?, list((int, int, float))) => t;
+/** Input signature of the functor {!Make}. */
+module type OrderedType = {
+  /** The type of the vertices. */
+  type t;
+  let compare: (t, t) => int;
 };
 
-/**
-  Prepackaged module for building graphs with [string] vertices.
- */
-module String: {
-  module Cmp: Comparable with type t = string;
-  type nonrec t = t(string, Cmp.identity);
+/** Output signature of the functor {!Make}. */
+module type S = {
+  type vertex;
+  /**
+   A bi-directional, read-only mapping of each vertex to its mate vertex.
+  */
+  type t;
+
+  [@text {|{2 Functions}|}];
+
+  /**
+   Computes a maximum-weighted matching on a general undirected weighted graph.
+   This function takes time O(n³). See {!section:usage} for examples of its use.
+
+   Accepts a list of tuples [(i, j, w)], each describing an undirected edge
+   between vertex [i] and vertex [j] with weight [w]. There is at most one edge
+   between any two vertices, and no vertex has an edge to itself. Duplicate
+   edges are ignored.
+
+   @param cardinality When set to [`Max], only maximum-cardinality matchings are
+   considered as solutions. [`NotMax] is the default.
+  */
   let make:
-    (~cardinality: cardinality=?, list((string, string, float))) => t;
+    (~cardinality: cardinality=?, list((vertex, vertex, float))) => t;
+
+  /**
+   Returns [mate] for a mated vertex, or raises [Not_found] if no such binding
+   exists.
+  */
+  let find: (t, vertex) => vertex;
+
+  /** Returns [Some(mate)] for a mated vertex, or [None] if none exists. */
+  let find_opt: (t, vertex) => option(vertex);
+
+  /**
+   Folds over the pairs of vertex mates. Each pair is used twice, once in each
+   order.
+  */
+  let fold: (t, ~init: 'acc, ~f: ('acc, vertex, vertex) => 'acc) => 'acc;
+
+  /**
+   Iterates over the pairs of vertex mates. Each pair is used twice, once in
+   each order.
+  */
+  let iter: (t, ~f: (vertex, vertex) => unit) => unit;
+
+  /**
+   Returns a list of tuples for each pair of vertex mates. Each pair is used
+   twice, once in each order.
+  */
+  let to_list: t => list((vertex, vertex));
+
+  /** Returns [true] if there are no mates, [false] otherwise. */
+  let is_empty: t => bool;
+
+  /** Returns [true] if the vertex has a mate, [false] otherwise. */
+  let mem: (vertex, t) => bool;
+
+  /**
+   Calling this with a [show] or [to_string] function will enable debug logging.
+  */
+  let enable_debug: (vertex => string) => unit;
+  let disable_debug: unit => unit;
 };
 
-[@text {|{2 Creating comparables}|}];
-
 /**
-  Turns a [Belt.Id.comparable] module into {!type:comparable}.
-  
-  This is unsafe because the compiler can't guarantee the [cmp] value will be
-  correct.
-
-  {[
-  module MyTypeCmp = Belt.Id.MakeComparable(MyType);
-  let blossomCmp =
-    Blossom.Match.unsafeComparableFromBelt(
-      ~id=(module MyTypeCmp),
-      ~cmp=MyType.cmp
-    );
-  ]}
- */
-let unsafeComparableFromBelt:
-  (~id: Belt.Id.comparable('vertex, 'id), ~cmp: ('vertex, 'vertex) => int) =>
-  comparable('vertex, 'id);
-
-/**
-  Turns a [Belt.Id.comparable] module into a {!type:comparable} with an
-  uncurried [cmp] function.
-  
-  This is unsafe because the compiler can't guarantee the [cmp] value will be
-  correct.
- */
-let unsafeComparableFromBeltU:
-  (
-    ~id: Belt.Id.comparable('vertex, 'id),
-    ~cmp: (. 'vertex, 'vertex) => int
-  ) =>
-  comparable('vertex, 'id);
-
-/**
-  Creates a {!type:comparable}.
-  {[
-  module IntCmp = Blossom.Match.MakeComparable({
-    type t = int;
-    let cmp: (t, t) => int = compare;
-  });
-  ]}
- */
-module MakeComparable:
-  (M: {
-     type t;
-     let cmp: (t, t) => int;
-   }) => Comparable with type t = M.t;
-
-/**
-  Creates a {!type:comparable} with an uncurried [cmp] function.
- */
-module MakeComparableU:
-  (M: {
-     type t;
-     let cmp: (. t, t) => int;
-   }) => Comparable with type t = M.t;
-
-/**
-  Creates a {!type:comparable}.
-  {[module IntCmp = (val Match.comparable(compare: (int, int) => int));]}
- */
-let comparable:
-  (('vertex, 'vertex) => int) => (module Comparable with type t = 'vertex);
-
-/**
-  Creates a {!type:comparable} with an uncurried [cmp] function.
- */
-let comparableU:
-  ((. 'vertex, 'vertex) => int) => (module Comparable with type t = 'vertex);
-
-/**
- Turns a {!type:comparable} into a [Belt.Id.comparable].
- */
-let comparableToBelt:
-  comparable('vertex, 'id) => Belt.Id.comparable('vertex, 'id);
+ Functor building an implementation of the blossom algorithmstructure given a
+ totally ordered type.
+*/
+module Make: (Ord: OrderedType) => S with type vertex = Ord.t;
 
 [@text
   {|
