@@ -72,8 +72,6 @@ module ParityList = {
   module Even = {
     type t('a) = even('a);
 
-    let zero = Empty;
-
     let rec reduce = (~init, ~f) =>
       fun
       | Empty => init
@@ -84,7 +82,7 @@ module ParityList = {
         fun
         | Empty => acc
         | Even(a, Odd(b, tail)) => aux(Even(b, Odd(a, acc)), tail);
-      aux(zero, l);
+      aux(Empty, l);
     };
 
     let concat = (l1, l2) => {
@@ -94,14 +92,14 @@ module ParityList = {
         | (Empty as l1, Even(a, Odd(b, l2)))
         | (Even(a, Odd(b, l1)), l2) => aux(Even(b, Odd(a, acc)), l1, l2)
         };
-      aux(zero, l1, l2);
+      aux(Empty, l1, l2);
     };
   };
 
   module Odd = {
     type t('a) = odd('a);
 
-    let one = x => Odd(x, Even.zero);
+    let one = x => Odd(x, Empty);
 
     let rec reduce = (~init, ~f) =>
       fun
@@ -288,11 +286,16 @@ module Edge = {
   /** Return the slack of the given edge. Does not work inside blossoms. */
   let slack = ({i, j, weight, _}) => i.dualVar +. j.dualVar -. weight;
 
-  let _debug = k => {
+  let debug = (k, ~show) => {
     let i = k.i.content;
     let j = k.j.content;
     let w = k.weight;
-    {j|{i: $i, j: $j, weight: $w}|j};
+    Printf.sprintf(
+      "i: %s, j: %s, weight: %s",
+      show(i),
+      show(j),
+      string_of_float(w),
+    );
   };
 };
 
@@ -319,10 +322,10 @@ module Endpoint = {
     | I(edge) => edge.j
     | J(edge) => edge.i;
 
-  let _debug =
+  let debug = (~show) =>
     fun
-    | I(edge) => "I(" ++ Edge._debug(edge) ++ ")"
-    | J(edge) => "J(" ++ Edge._debug(edge) ++ ")";
+    | I(edge) => "I(" ++ Edge.debug(edge, ~show) ++ ")"
+    | J(edge) => "J(" ++ Edge.debug(edge, ~show) ++ ")";
 };
 
 module Vertex = {
@@ -332,7 +335,7 @@ module Vertex = {
      types because they never change after the graph is created. */
   let eq: (t('v), t('v)) => bool = (a, b) => a.content === b.content;
 
-  let _debug: t('v) => string = v => Js.String.make(v.content);
+  let debug = (v: t(_), ~show) => show(v.content);
 };
 
 module Blossom = {
@@ -340,7 +343,7 @@ module Blossom = {
 
   let eq: (t('v), t('v)) => bool = (a, b) => a.content == b.content;
 
-  let _debug: t('v) => string = b => Js.String.make(b.content);
+  let debug = (b: t(_)) => string_of_int(b.content);
 };
 
 module Node = {
@@ -369,10 +372,10 @@ module Node = {
 
   let label = (Vertex({label, _}) | Blossom({label, _})) => label;
 
-  let _debug =
+  let debug = (~show) =>
     fun
-    | Vertex({content, _}) => {j|Vertex($content)|j}
-    | Blossom({content, _}) => {j|Blossom($content)|j};
+    | Vertex({content, _}) => "Vertex(" ++ show(content) ++ ")"
+    | Blossom({content, _}) => "Blossom(" ++ string_of_int(content) ++ ")";
 
   module Leaves = {
     /**
@@ -389,21 +392,29 @@ module Node = {
 
     let toList = reduce(~f=(leaves, v) => [v, ...leaves]);
 
-    let _debug = b =>
-      b->toList(~init=[])->Belt.List.map(Vertex._debug)->Belt.List.toArray;
+    let debug = (b, ~show): string =>
+      b
+      |> toList(~init=[])
+      |> List.map(Vertex.debug(~show))
+      |> String.concat(", ");
   };
 };
 
 module Child = {
   type t('v) = child('v);
 
-  let _debug = c =>
-    ParityList.Odd.reduce(c, ~init=[||], ~f=(acc, {node, endpoint}) =>
-      Belt.Array.concat(
-        acc,
-        [|(Node._debug(node), Endpoint._debug(endpoint))|],
-      )
-    );
+  let debug = (c, ~show) =>
+    ParityList.Odd.reduce(c, ~init=[], ~f=(acc, {node, endpoint}) =>
+      [
+        Printf.sprintf(
+          "(%s, %s)",
+          Node.debug(node, ~show),
+          Endpoint.debug(endpoint, ~show),
+        ),
+        ...acc,
+      ]
+    )
+    |> String.concat(", ");
 };
 
 /*******************************************************************************
@@ -427,12 +438,22 @@ module type S = {
   let to_list: t => list((vertex, vertex));
   let is_empty: t => bool;
   let mem: (vertex, t) => bool;
+  let enable_debug: (vertex => string) => unit;
+  let disable_debug: unit => unit;
 };
 
 module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
   type vertex = Ord.t;
   module Map = Map.Make(Ord);
   type t = Map.t(Endpoint.t(vertex));
+  let debug_show = ref(None);
+  let enable_debug = f => debug_show := Some(f);
+  let disable_debug = () => debug_show := None;
+  let debug_print = f =>
+    switch (debug_show^) {
+    | None => ()
+    | Some(show) => print_endline(f(show))
+    };
 
   module Mates = {
     /** Maps vertices to remote endpoints of their attached edges. */
@@ -451,29 +472,39 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
 
     let exportEndpoint = p => Endpoint.toVertex(p).content;
 
-    let _debug = mates =>
-      Map.fold((a, b, acc) => [(a, exportEndpoint(b)), ...acc], mates, [])
-      ->Belt.List.toArray;
+    let debug = (mates, ~show) =>
+      Map.fold(
+        (a, b, acc) =>
+          [
+            Printf.sprintf("(%s, %s)", show(a), show(exportEndpoint(b))),
+            ...acc,
+          ],
+        mates,
+        [],
+      )
+      |> String.concat(", ");
   };
 
   module Label = {
-    let _debug =
+    let debug = (~show) =>
       fun
       | Free => "Free"
       | SingleS => "SingleS"
-      | S(endpoint) => "S(" ++ Endpoint._debug(endpoint) ++ ")"
-      | T(endpoint) => "T(" ++ Endpoint._debug(endpoint) ++ ")";
+      | S(endpoint) => "S(" ++ Endpoint.debug(endpoint, ~show) ++ ")"
+      | T(endpoint) => "T(" ++ Endpoint.debug(endpoint, ~show) ++ ")";
 
     /** Label a vertex S and add its inBlossom's children to the queue. */
     let assignS = (~v, ~label, ~queue) => {
       let b = v.fields.inBlossom;
-      [%log.debug
-        "assignLabel";
-        ("Vertex", Vertex._debug(v));
-        ("Blossom", Node._debug(b));
-        ("Label", _debug(label));
-        ("PUSH", Node.Leaves._debug(b))
-      ];
+      debug_print(show =>
+        Printf.sprintf(
+          "assignLabel. Vertex: %s, Blossom: %s, Label: %s",
+          Vertex.debug(v, ~show),
+          Node.debug(b, ~show),
+          debug(label, ~show),
+        )
+      );
+      debug_print(show => "PUSH " ++ Node.Leaves.debug(b, ~show));
       switch (b) {
       | Blossom(b) =>
         b.label = label;
@@ -493,12 +524,14 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
     */
     let assignT = (~v, ~p, ~mates, ~queue) => {
       let b = v.fields.inBlossom;
-      [%log.debug
-        "assignLabel";
-        ("Vertex", Vertex._debug(v));
-        ("Blossom", Node._debug(b));
-        ("Label", _debug(T(p)))
-      ];
+      debug_print(show =>
+        Printf.sprintf(
+          "assignLabel. Vertex: %s, Blossom: %s, Label: %s",
+          Vertex.debug(v, ~show),
+          Node.debug(b, ~show),
+          debug(T(p), ~show),
+        )
+      );
       let label = T(p);
       switch (b) {
       | Blossom(b) =>
@@ -854,11 +887,13 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
      or an augmenting path.
     */
     let scanForBlossom = ({i, j, _} as edge) => {
-      [%log.debug
-        "scanBlossom";
-        ("v", Vertex._debug(i));
-        ("w", Vertex._debug(j))
-      ];
+      debug_print(show =>
+        Printf.sprintf(
+          "scanBlossom. v: %s, w: %s",
+          Vertex.debug(i, ~show),
+          Vertex.debug(j, ~show),
+        )
+      );
       open ParityList;
       let rec aux = (frontPath, backPath) =>
         switch (frontPath, backPath) {
@@ -894,7 +929,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       aux(
         /* Manually add the i child to connect the two lists. */
         FoundChild(initialV, Odd.one({node: initialV, endpoint: I(edge)})),
-        FoundChild(j.fields.inBlossom, Even.zero),
+        FoundChild(j.fields.inBlossom, Empty),
       );
     };
 
@@ -1105,7 +1140,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
         | Even(child, Odd(child', back)) =>
           aux(Even(child', Odd(child, front)), back)
         };
-      aux(Even.zero, rest);
+      aux(Empty, rest);
     };
 
     let rec bubbleBlossomTree = (node, b) =>
@@ -1125,12 +1160,14 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
      consistent.
     */
     let rec augment = (b, v, mates) => {
-      [%log.debug
-        "augmentBlossom";
-        ("Blossom", Blossom._debug(b));
-        ("Vertex", Vertex._debug(v));
-        ("Mates", Mates._debug(mates))
-      ];
+      debug_print(show =>
+        Printf.sprintf(
+          "augmentBlossom.\n  Blossom: %s,\n  Vertex: %s,\n  Mates: %s",
+          Blossom.debug(b),
+          Vertex.debug(v, ~show),
+          Mates.debug(mates, ~show),
+        )
+      );
       /* Bubble up through the blossom tree from from the vertex to an immediate
          sub-blossom of `b`. */
       let t = bubbleBlossomTree(Vertex(v), b, v.parent);
@@ -1143,7 +1180,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       /* Figure out how we'll go 'round the blossom. */
       let (moveList, direction, children) =
         switch (splitChildren(b.fields.children, t)) {
-        | NoSplit(_) => (Even.zero, Backward, b.fields.children)
+        | NoSplit(_) => (Empty, Backward, b.fields.children)
         | GoForward({base, front, entry, back}) =>
           let moveList = Odd.concat(back, Odd.one(base));
           /* Rotate the list of sub-blossoms to put the new base at the front. */
@@ -1178,11 +1215,13 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
               };
             /* Match the edge connecting those sub-blossoms. */
             let mates = Mates.setEdge(mates, Endpoint.toEdge(p));
-            [%log.debug
-              "PAIR";
-              ("v", p |> Endpoint.toVertex |> Vertex._debug);
-              ("w", p |> Endpoint.toReverseVertex |> Vertex._debug)
-            ];
+            debug_print(show =>
+              Printf.sprintf(
+                "PAIR. v: %s, w: %s",
+                p |> Endpoint.toVertex |> Vertex.debug(~show),
+                p |> Endpoint.toReverseVertex |> Vertex.debug(~show),
+              )
+            );
             loopToBase(mates, rest);
           };
       loopToBase(mates, moveList);
@@ -1214,17 +1253,17 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
 
     /** Expand the given top-level blossom. */
     let rec expand = (~graph, ~b, ~stage, ~mates, ~queue) => {
-      let _debug_endstage =
-        switch (stage) {
-        | Endstage => "Endstage"
-        | NotEndstage => "Not endstage"
-        };
-      [%log.debug
-        "expandBlossom";
-        ("Blossom", Blossom._debug(b));
-        ("Endstage", _debug_endstage);
-        ("Children", Child._debug(b.fields.children))
-      ];
+      debug_print(show =>
+        Printf.sprintf(
+          "expandBlossom.\n  Blossom: %s,\n  Endstage: %s,\n  Children: %s",
+          Blossom.debug(b),
+          switch (stage) {
+          | Endstage => "Endstage"
+          | NotEndstage => "Not endstage"
+          },
+          Child.debug(b.fields.children, ~show),
+        )
+      );
       /* Convert sub-blossoms into top-level blossoms. */
       let queue =
         Odd.reduce(b.fields.children, ~init=queue, ~f=(queue, child) =>
@@ -1359,12 +1398,12 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       | Three(float, Edge.t('v))
       | Four(float, Blossom.t('v));
 
-    let _debug =
+    let debug =
       fun
-      | One(delta) => {j|1=$delta|j}
-      | Two(delta, _) => {j|2=$delta|j}
-      | Three(delta, _) => {j|3=$delta|j}
-      | Four(delta, _) => {j|4=$delta|j};
+      | One(delta) => "1=" ++ string_of_float(delta)
+      | Two(delta, _) => "2=" ++ string_of_float(delta)
+      | Three(delta, _) => "3=" ++ string_of_float(delta)
+      | Four(delta, _) => "4=" ++ string_of_float(delta);
 
     let getMinDualVar = ({vertices, maxWeight, _}) => {
       let rec aux = minDualVar =>
@@ -1546,15 +1585,20 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
      of S vertices.
     */
     let augmentMatching = (edge, mates) => {
-      [%log.debug
-        "augmentMatching";
-        ("v", Vertex._debug(edge.i));
-        ("w", Vertex._debug(edge.j))
-      ];
-      [%log.debug
-        "PAIR";
-        ("PAIR", (Vertex._debug(edge.i), Vertex._debug(edge.j)))
-      ];
+      debug_print(show =>
+        Printf.sprintf(
+          "augmentMatching. v: %s, w: %s",
+          Vertex.debug(edge.i, ~show),
+          Vertex.debug(edge.j, ~show),
+        )
+      );
+      debug_print(show =>
+        Printf.sprintf(
+          "PAIR: %s, %s",
+          Vertex.debug(edge.i, ~show),
+          Vertex.debug(edge.j, ~show),
+        )
+      );
       Augmented(
         mates
         |> augmentMatchingLoop(~s=edge.i, ~p=J(edge))
@@ -1604,17 +1648,16 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
                   /* Found a new blossom; add it to the blossom bookkeeping and
                      turn it into an S-blossom. */
                   | AddBlossom.NewBlossom(children) =>
-                    let ParityList.Odd({node: _debug_node, _}, _) = children;
-                    [%log.debug
-                      "addBlossom";
-                      ("base", Node._debug(_debug_node));
-                      ("v", Vertex._debug(edge.i));
-                      ("w", Vertex._debug(edge.j))
-                    ];
-                    [%log.debug
-                      "blossomChildren";
-                      ("children", Child._debug(children))
-                    ];
+                    debug_print(show => {
+                      let ParityList.Odd({node, _}, _) = children;
+                      Printf.sprintf(
+                        "addBlossom.\n  base: %s\n  v: %s\n  w: %s\n  blossomChildren: %s",
+                        Node.debug(node, ~show),
+                        Vertex.debug(edge.i, ~show),
+                        Vertex.debug(edge.j, ~show),
+                        Child.debug(children, ~show),
+                      );
+                    });
                     let queue = AddBlossom.make(graph, children, queue);
                     aux(~queue, neighbors);
                   /* Found an augmenting path; augment the matching and end this
@@ -1692,7 +1735,7 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       fun
       | [] => NotAugmented([], mates)
       | [vertex, ...queue] => {
-          [%log.debug "POP"; ("Vertex", Vertex._debug(vertex))];
+          debug_print(show => "POP Vertex: " ++ Vertex.debug(vertex, ~show));
           switch (scanNeighbors(~vertex, ~graph, ~mates, ~queue)) {
           | NotAugmented(queue, mates) => labelingLoop(graph, mates, queue)
           | Augmented(_) as augmented => augmented
@@ -1700,15 +1743,15 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
         };
 
     let rec make = (graph, queue, mates, cardinality) => {
-      %log.debug
-      "SUBSTAGE";
+      debug_print(_ => "SUBSTAGE");
+
       switch (labelingLoop(graph, mates, queue)) {
       | NotAugmented(queue, mates) =>
         /* There is no augmenting path under these constraints;
            compute delta and reduce slack in the optimization problem. */
         let delta = Delta.make(~cardinality, ~graph);
         /* Take action at the point where the minimum delta occurred. */
-        [%log.debug "DELTA"; ("delta", Delta._debug(delta))];
+        debug_print(_ => "DELTA " ++ Delta.debug(delta));
         switch (delta) {
         /* No further improvement possible; optimum reached. */
         | Delta.One(delta) =>
@@ -1821,7 +1864,13 @@ module Make = (Ord: OrderedType) : (S with type vertex = Ord.t) => {
       if (stageNum == graph.vertexSize) {
         Map.empty;
       } else {
-        [%log.debug {j|STAGE $stageNum|j}; ("Mates", Mates._debug(mates))];
+        debug_print(show =>
+          Printf.sprintf(
+            "STAGE %i. Mates: %s",
+            stageNum,
+            Mates.debug(mates, ~show),
+          )
+        );
         /* Each iteration of this loop is a "stage". A stage finds an augmenting
            path and uses that to improve the matching. */
         let queue = resetStage(~graph, ~mates);

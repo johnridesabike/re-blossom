@@ -44,9 +44,7 @@
     "src/**/*.rei",
     "bsconfig.json"
   ],
-  "peerDependencies": {
-    "bs-platform": "^8.0.2"
-  },
+  "peerDependencies": {},
   "devDependencies": {
     "@glennsl/bs-jest": "^0.7.0",
     "benchmark": "^2.1.4",
@@ -55,7 +53,5 @@
     "edmonds-blossom": "^1.0.0",
     "serve": "^11.3.2"
   },
-  "dependencies": {
-    "bs-log": "^1.2.0"
-  }
+  "dependencies": {}
 }

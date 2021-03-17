@@ -42,8 +42,8 @@ the same algorithm, but optimized for a JavaScript environment.
 
 This package originally had similar optimizations, but I've reworked it to be
 more compatible with native-Reason. This package currently still relies on
-[bs-platform] to compile to JavaScript, but that's only for the debugging and
-testing code. All of the core code should be native-compatible.
+[bs-platform] to compile to JavaScript, but that's only for testing. All of
+the core modules should be native-compatible.
 
 I'm not currently using this package in a native environment, so I haven't
 fully converted it yet. If you think you will find this useful, I encourage
@@ -303,6 +303,12 @@ module type S = {
 
   /** Returns [true] if the vertex has a mate, [false] otherwise. */
   let mem: (vertex, t) => bool;
+
+  /**
+   Calling this with a [show] or [to_string] function will enable debug logging.
+  */
+  let enable_debug: (vertex => string) => unit;
+  let disable_debug: unit => unit;
 };
 
 /**

@@ -1,7 +1,6 @@
 # Re-Blossom 🌺
 
 ![GitHub package.json version](https://img.shields.io/github/package-json/v/johnridesabike/re-blossom)
-![npm peer dependency version](https://img.shields.io/npm/dependency-version/re-blossom/peer/bs-platform?label=BuckleScript)
 ![Node.js CI](https://github.com/johnridesabike/re-blossom/workflows/Node.js%20CI/badge.svg)
 ![GitHub](https://img.shields.io/github/license/johnridesabike/re-blossom)
 
@@ -19,8 +18,8 @@ the same algorithm, but optimized for a JavaScript environment.
 
 This package originally had similar optimizations, but I've reworked it to be
 more compatible with native-Reason. This package currently still relies on
-`bs-platform` to compile to JavaScript, but that's only for the debugging and
-testing code. All of the core code should be native-compatible.
+[bs-platform] to compile to JavaScript, but that's only for testing. All of
+the core modules should be native-compatible.
 
 I'm not currently using this package in a native environment, so I haven't
 fully converted it yet. If you think you will find this useful, I encourage

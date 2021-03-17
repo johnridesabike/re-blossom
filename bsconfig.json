@@ -27,9 +27,9 @@
     }
   ],
   "suffix": ".bs.js",
-  "bs-dependencies": ["bs-log"],
+  "bs-dependencies": [],
   "bs-dev-dependencies": ["@glennsl/bs-jest"],
-  "ppx-flags": [["bs-log/ppx", "--lib=re-blossom"]],
+  "ppx-flags": [],
   "warnings": {
     "number": "+A-48",
     "error": "+A-3-44-102"
